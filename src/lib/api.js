@@ -6,22 +6,42 @@ export async function getEmailByUsername(username) {
   if (!data) { const e = new Error("Username tidak ditemukan."); e.code = "username-not-found"; throw e; }
   return data;
 }
+
 export async function signUpUser({ email, username, password }) {
   const { data, error } = await supabase.auth.signUp({ email: email.trim(), password, options: { data: { username: username.trim() } } });
-  if (error) throw error; return data;
+  if (error) throw error;
+  return data;
 }
+
 export async function signInWithUsername({ username, password }) {
   const email = await getEmailByUsername(username);
   const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-  if (error) throw error; return data;
+  if (error) throw error;
+  return data;
 }
-export async function signOutUser() { const { error } = await supabase.auth.signOut(); if (error) throw error; }
+
+export async function signOutUser() {
+  const { error } = await supabase.auth.signOut();
+  if (error) throw error;
+}
+
 export async function getCurrentProfile() {
-  const { data: s, error: se } = await supabase.auth.getSession(); if (se || !s?.session) return null;
-  const { data, error } = await supabase.rpc("get_my_profile"); if (error || !data?.length) return null; return data[0];
+  const { data: s, error: se } = await supabase.auth.getSession();
+  if (se || !s?.session) return null;
+  const { data, error } = await supabase.rpc("get_my_profile");
+  if (error || !data?.length) return null;
+  return data[0];
 }
-export async function requestPasswordReset(email) { const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), { redirectTo: `${window.location.origin}/reset-password` }); if (error) throw error; }
-export async function updatePasswordAfterRecovery(newPassword) { const { error } = await supabase.auth.updateUser({ password: newPassword }); if (error) throw error; }
+
+export async function requestPasswordReset(email) {
+  const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), { redirectTo: `${window.location.origin}/reset-password` });
+  if (error) throw error;
+}
+
+export async function updatePasswordAfterRecovery(newPassword) {
+  const { error } = await supabase.auth.updateUser({ password: newPassword });
+  if (error) throw error;
+}
 
 export async function saveDataUpdateSubmission(userId, { formData, files, indikasi }) {
   if (!userId) throw new Error("Akun pengguna tidak ditemukan.");
@@ -33,11 +53,21 @@ export async function saveDataUpdateSubmission(userId, { formData, files, indika
     const path = `${userId}/pengajuan-${Date.now()}-${key}-${safeName}`;
     const { error } = await supabase.storage.from(bucket).upload(path, file, { upsert: false });
     if (error) throw error;
-    payload[`${key}_path`] = path; payload[`${key}_nama_file`] = file.name;
+    payload[`${key}_path`] = path;
+    payload[`${key}_nama_file`] = file.name;
   }
   const { data, error } = await supabase.from("desil_submissions").insert({ user_id: userId, data: payload, score: null, indikasi: indikasi ?? null }).select("id, created_at").single();
   if (error) throw error;
   const date = new Date(data.created_at || Date.now());
   const nomorPengajuan = `DSK-${date.getFullYear()}${String(date.getMonth()+1).padStart(2,"0")}${String(date.getDate()).padStart(2,"0")}-${String(data.id).slice(0,4).toUpperCase()}`;
-  return { id: data.id, nomorPengajuan, tanggal: date.toLocaleDateString("id-ID") };
+  return { id: data.id, nomorPengajuan, tanggal: date.toLocaleDateString("id-ID"), created_at: date.toISOString() };
+}
+
+export async function getMySubmissions() {
+  const { data, error } = await supabase.from("desil_submissions").select("id, created_at, data, indikasi").order("created_at", { ascending: false });
+  if (error) throw error;
+  return (data || []).map(row => {
+    const created = new Date(row.created_at || Date.now());
+    return { ...row, nomorPengajuan: `DSK-${created.getFullYear()}${String(created.getMonth()+1).padStart(2,"0")}${String(created.getDate()).padStart(2,"0")}-${String(row.id).slice(0,4).toUpperCase()}` };
+  });
 }
