@@ -167,4 +167,5 @@ export async function requestPasswordReset(email) {
         redirectTo:
           `${window.location.origin}/reset-password`,
       }
-   
+  return data || [];
+}
