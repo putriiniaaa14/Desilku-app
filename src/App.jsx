@@ -1,1119 +1,576 @@
-import { useState, useEffect, useRef } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
-  Eye, EyeOff, User, Lock, Mail, LogOut, KeyRound, ChevronRight, ChevronLeft,
-  CheckCircle2, Home as HomeIcon, ShieldCheck, Zap, Car, GraduationCap,
-  HeartPulse, Wallet, Users as UsersIcon, ClipboardList, AlertCircle,
-  Settings, ArrowLeft, Sparkles, FileText, Upload
+  ArrowLeft,
+  ArrowRight,
+  CheckCircle2,
+  ClipboardList,
+  FileCheck2,
+  FileText,
+  Home,
+  LogIn,
+  LogOut,
+  User,
+  Upload,
 } from "lucide-react";
-import { supabase } from "./lib/supabaseClient";
 import {
-  isUsernameTaken, signUpUser, signInWithUsername, signOutUser,
-  getCurrentProfile, requestPasswordReset, updatePasswordAfterRecovery,
-  changePassword, saveDesilSubmission, getAdminSubmissions,
+  getCurrentProfile,
+  requestPasswordReset,
+  saveDataUpdateSubmission,
+  signInWithUsername,
+  signOutUser,
+  signUpUser,
+  updatePasswordAfterRecovery,
 } from "./lib/api";
 
-/* ---------------------------------- Tokens ---------------------------------- */
-const C = {
-  green: "#0E7C5A",
-  greenDark: "#0A5F45",
-  greenSoft: "#E4F3EC",
-  blue: "#1F6FB2",
-  blueDark: "#154F80",
-  blueSoft: "#E5F0FA",
-  yellow: "#FFC63A",
-  yellowDark: "#E8A912",
-  yellowSoft: "#FFF6E0",
-  cream: "#F7F9F4",
-  ink: "#123024",
-  inkSoft: "#5B7268",
-  line: "#DCE6DF",
-  danger: "#C24444",
-  dangerSoft: "#FBEAEA",
-};
-const FONT_HEAD = "'Baloo 2', system-ui, sans-serif";
-const FONT_BODY = "'Plus Jakarta Sans', system-ui, sans-serif";
-const FONTS = (
-  <style>{`
-    @import url('https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
-    * { font-family: ${FONT_BODY}; }
-    .font-head { font-family: ${FONT_HEAD}; }
-    input:focus, select:focus { outline: none; }
-    ::selection { background: ${C.yellow}; }
-  `}</style>
-);
-
-/* -------------------------------- Utilities --------------------------------- */
-function cx(...a) { return a.filter(Boolean).join(" "); }
-
-/* -------------------------------- Small UI bits ------------------------------ */
-function PressButton({ children, onClick, style, className = "", type = "button", disabled, full }) {
-  const [pressed, setPressed] = useState(false);
-  return (
-    <button
-      type={type}
-      disabled={disabled}
-      onClick={onClick}
-      onMouseDown={() => setPressed(true)}
-      onMouseUp={() => setPressed(false)}
-      onMouseLeave={() => setPressed(false)}
-      onTouchStart={() => setPressed(true)}
-      onTouchEnd={() => setPressed(false)}
-      className={cx("transition-all duration-100 select-none", full && "w-full", className)}
-      style={{
-        ...style,
-        transform: pressed ? "translateY(2px) scale(0.98)" : "translateY(0) scale(1)",
-        boxShadow: pressed
-          ? "inset 0 2px 4px rgba(0,0,0,0.25)"
-          : style?.boxShadow || "0 4px 0 rgba(0,0,0,0.12)",
-        opacity: disabled ? 0.55 : 1,
-        cursor: disabled ? "not-allowed" : "pointer",
-      }}
-    >
-      {children}
-    </button>
-  );
-}
-
-function Toast({ toast }) {
-  if (!toast) return null;
-  const bg = toast.type === "error" ? C.danger : toast.type === "info" ? C.blue : C.green;
-  return (
-    <div
-      className="fixed top-4 right-4 z-50 rounded-xl px-4 py-3 text-sm font-medium text-white shadow-lg flex items-center gap-2 max-w-xs"
-      style={{ backgroundColor: bg }}
-    >
-      {toast.type === "error" ? <AlertCircle size={18} /> : <CheckCircle2 size={18} />}
-      {toast.message}
-    </div>
-  );
-}
-
-function Logo({ size = 34 }) {
-  return (
-    <div className="flex items-center gap-2">
-      <div className="relative" style={{ width: size, height: size }}>
-        <div className="absolute rounded-full" style={{ width: size * 0.62, height: size * 0.62, background: C.green, top: 0, left: 0 }} />
-        <div className="absolute rounded-full" style={{ width: size * 0.5, height: size * 0.5, background: C.yellow, bottom: 0, left: size * 0.3 }} />
-        <div className="absolute rounded-full" style={{ width: size * 0.55, height: size * 0.55, background: C.blue, bottom: 0, right: 0 }} />
-      </div>
-      <span className="font-head font-bold text-lg" style={{ color: C.ink }}>Desilku</span>
-    </div>
-  );
-}
-
-function TextInput({ label, icon: Icon, type = "text", value, onChange, placeholder, hint, error, showToggle, show, onToggle }) {
-  return (
-    <div>
-      {label && <label className="block text-sm font-semibold mb-1.5" style={{ color: C.ink }}>{label}</label>}
-      <div className="relative">
-        {Icon && <Icon size={17} className="absolute left-3.5 top-1/2 -translate-y-1/2" style={{ color: C.inkSoft }} />}
-        <input
-          type={showToggle ? (show ? "text" : "password") : type}
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          placeholder={placeholder}
-          className="w-full rounded-xl border-2 py-2.5 text-sm bg-white"
-          style={{
-            borderColor: error ? C.danger : C.line,
-            paddingLeft: Icon ? "2.5rem" : "1rem",
-            paddingRight: showToggle ? "2.5rem" : "1rem",
-            color: C.ink,
-          }}
-        />
-        {showToggle && (
-          <button type="button" onClick={onToggle} className="absolute right-3.5 top-1/2 -translate-y-1/2" style={{ color: C.inkSoft }}>
-            {show ? <EyeOff size={17} /> : <Eye size={17} />}
-          </button>
-        )}
-      </div>
-      {error ? (
-        <p className="text-xs mt-1 font-medium" style={{ color: C.danger }}>{error}</p>
-      ) : hint ? (
-        <p className="text-xs mt-1" style={{ color: C.inkSoft }}>{hint}</p>
-      ) : null}
-    </div>
-  );
-}
-
-/* ------------------------------------ App ------------------------------------ */
-export default function App() {
-  const [screen, setScreen] = useState("welcome");
-  const [authTab, setAuthTab] = useState("login");
-  const [currentUser, setCurrentUser] = useState(null);
-  const [toast, setToast] = useState(null);
-  const [busy, setBusy] = useState(false);
-  const [checkingSession, setCheckingSession] = useState(true);
-  const [resetEmail, setResetEmail] = useState("");
-  const toastTimer = useRef(null);
-
-  function notify(type, message) {
-    setToast({ type, message });
-    clearTimeout(toastTimer.current);
-    toastTimer.current = setTimeout(() => setToast(null), 3200);
-  }
-
-  // Sinkron dengan sesi Supabase Auth: jika sudah login (mis. setelah refresh
-  // halaman), langsung masuk ke Home. Event PASSWORD_RECOVERY dipicu Supabase
-  // ketika pengguna membuka tautan reset sandi dari email -> arahkan ke ResetScreen.
-  useEffect(() => {
-    let mounted = true;
-
-    (async () => {
-      const profile = await getCurrentProfile();
-      if (!mounted) return;
-      if (profile) {
-        setCurrentUser(profile);
-        setScreen("home");
-      }
-      setCheckingSession(false);
-    })();
-
-    const { data: listener } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === "PASSWORD_RECOVERY") {
-        setResetEmail(session?.user?.email || "");
-        setScreen("reset");
-      }
-      if (event === "SIGNED_OUT") {
-        setCurrentUser(null);
-      }
-    });
-
-    return () => {
-      mounted = false;
-      listener?.subscription?.unsubscribe();
-    };
-  }, []);
-
-  if (checkingSession) {
-    return (
-      <div className="w-full min-h-[640px] flex items-center justify-center" style={{ background: C.cream }}>
-        {FONTS}
-        <p className="text-sm font-semibold" style={{ color: C.inkSoft }}>Memuat…</p>
-      </div>
-    );
-  }
-
-  const shellStyle = { background: `linear-gradient(160deg, ${C.cream} 0%, #FFFFFF 55%, ${C.cream} 100%)`, minHeight: 640 };
-
-  return (
-    <div className="w-full min-h-[640px] rounded-2xl overflow-hidden" style={shellStyle}>
-      {FONTS}
-      <Toast toast={toast} />
-      {screen === "welcome" && <Welcome onGo={(tab) => { setAuthTab(tab); setScreen("auth"); }} />}
-      {screen === "auth" && (
-        <AuthScreen
-          tab={authTab}
-          setTab={setAuthTab}
-          busy={busy}
-          setBusy={setBusy}
-          notify={notify}
-          onBack={() => setScreen("welcome")}
-          onForgot={() => setScreen("forgot")}
-          onLoggedIn={(u) => { setCurrentUser(u); setScreen("home"); notify("success", `Selamat datang, ${u.username}!`); }}
-        />
-      )}
-      {screen === "forgot" && (
-        <ForgotScreen
-          busy={busy} setBusy={setBusy} notify={notify}
-          onBackToLogin={() => { setAuthTab("login"); setScreen("auth"); }}
-        />
-      )}
-      {screen === "reset" && (
-        <ResetScreen
-          busy={busy} setBusy={setBusy} notify={notify}
-          onDone={() => { setAuthTab("login"); setScreen("auth"); notify("success", "Sandi berhasil diperbarui. Silakan masuk."); }}
-          onBackToLogin={() => { setAuthTab("login"); setScreen("auth"); }}
-        />
-      )}
-      {screen === "home" && currentUser && (
-        <HomeScreen
-          user={currentUser}
-          onLogout={async () => { await signOutUser(); setCurrentUser(null); setScreen("welcome"); notify("info", "Anda telah keluar."); }}
-          onCekDesil={() => setScreen("cekdesil")}
-          onChangePassword={() => setScreen("changepass")}
-          onAdmin={() => setScreen("admin")}
-        />
-      )}
-      {screen === "changepass" && currentUser && (
-        <ChangePasswordScreen
-          user={currentUser} busy={busy} setBusy={setBusy} notify={notify}
-          onBack={() => setScreen("home")}
-        />
-      )}
-      {screen === "cekdesil" && currentUser && (
-        <CekDesilScreen
-          user={currentUser} busy={busy} setBusy={setBusy} notify={notify}
-          onBack={() => setScreen("home")}
-        />
-      )}
-      {screen === "admin" && currentUser?.role === "admin" && (
-        <AdminScreen
-          user={currentUser}
-          notify={notify}
-          onBack={() => setScreen("home")}
-        />
-      )}
-    </div>
-  );
-}
-
-/* ------------------------------------ Welcome --------------------------------- */
-function Welcome({ onGo }) {
-  return (
-    <div className="relative flex flex-col items-center justify-center px-6 py-16 min-h-[640px] overflow-hidden">
-      <div className="absolute rounded-full opacity-20" style={{ width: 320, height: 320, background: C.green, top: -120, left: -100 }} />
-      <div className="absolute rounded-full opacity-20" style={{ width: 260, height: 260, background: C.blue, bottom: -100, right: -80 }} />
-      <div className="absolute rounded-full opacity-25" style={{ width: 140, height: 140, background: C.yellow, top: 60, right: 40 }} />
-
-      <div className="relative z-10 flex flex-col items-center text-center max-w-md">
-        <Logo size={46} />
-        <h1 className="font-head font-extrabold mt-8 leading-tight" style={{ fontSize: 34, color: C.ink }}>
-          Cek desil keluargamu,<br />ajukan peninjauan lebih mudah
-        </h1>
-        <p className="mt-4 text-[15px]" style={{ color: C.inkSoft }}>
-          Satu tempat untuk melihat status kesejahteraan keluarga dan menyiapkan data peninjauan desil tanpa perlu bolak-balik kantor desa.
-        </p>
-
-        <div className="mt-10 w-full flex flex-col gap-3.5">
-          <PressButton
-            onClick={() => onGo("login")}
-            className="rounded-2xl py-3.5 font-head font-bold text-white text-[15px]"
-            style={{ background: `linear-gradient(135deg, ${C.green}, ${C.greenDark})`, boxShadow: `0 4px 0 ${C.greenDark}` }}
-          >
-            Masuk
-          </PressButton>
-          <PressButton
-            onClick={() => onGo("signup")}
-            className="rounded-2xl py-3.5 font-head font-bold text-[15px] border-2"
-            style={{ background: "white", color: C.blueDark, borderColor: C.blue, boxShadow: `0 4px 0 ${C.blueSoft}` }}
-          >
-            Daftar Akun Baru
-          </PressButton>
-        </div>
-
-        <p className="mt-6 text-xs" style={{ color: C.inkSoft }}>
-          Data yang kamu isi digunakan hanya untuk proses pengecekan &amp; pengajuan peninjauan desil.
-        </p>
-      </div>
-    </div>
-  );
-}
-
-/* -------------------------------- Auth (Login/Daftar) ------------------------- */
-function AuthScreen({ tab, setTab, busy, setBusy, notify, onBack, onForgot, onLoggedIn }) {
-  const [loginForm, setLoginForm] = useState({ username: "", password: "" });
-  const [loginErr, setLoginErr] = useState({});
-  const [loginFailed, setLoginFailed] = useState(false);
-  const [loginMessage, setLoginMessage] = useState("");
-  const [showPass, setShowPass] = useState(false);
-
-  const [signupForm, setSignupForm] = useState({ email: "", username: "", password: "" });
-  const [signupErr, setSignupErr] = useState({});
-  const [showPass2, setShowPass2] = useState(false);
-
-  async function handleLogin(e) {
-    e.preventDefault();
-    setLoginFailed(false);
-    setLoginMessage("");
-    const err = {};
-    if (!loginForm.username.trim()) err.username = "Username wajib diisi.";
-    if (loginForm.password.length < 8) err.password = "Sandi minimal 8 karakter.";
-    setLoginErr(err);
-    if (Object.keys(err).length) return;
-
-    setBusy(true);
-    try {
-      const { user } = await signInWithUsername({
-        username: loginForm.username.trim().toLowerCase(),
-        password: loginForm.password,
-      });
-      const profile = await getCurrentProfile();
-
-      if (!profile) {
-        throw new Error("Akun berhasil masuk, tetapi profil pengguna belum ditemukan. Jalankan SQL perbaikan profil di Supabase.");
-      }
-
-      onLoggedIn(profile || { username: loginForm.username.trim(), id: user.id });
-    } catch (e2) {
-      setLoginFailed(true);
-      if (e2?.code === "username-not-found") {
-        setLoginMessage("Username belum terdaftar.");
-      } else if (e2?.code === "email_not_confirmed") {
-        setLoginMessage("Email akun ini belum dikonfirmasi. Cek inbox email lalu klik tautan konfirmasi dari Supabase.");
-      } else if (e2?.code === "invalid_credentials") {
-        setLoginMessage("Password tidak sesuai.");
-      } else {
-        setLoginMessage(e2?.message || "Login gagal. Periksa koneksi Supabase dan data akun.");
-      }
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function handleSignup(e) {
-    e.preventDefault();
-    const err = {};
-    if (!/^\S+@\S+\.\S+$/.test(signupForm.email)) err.email = "Format email tidak valid.";
-    if (!signupForm.username.trim() || signupForm.username.length < 4) err.username = "Username minimal 4 karakter.";
-    if (signupForm.password.length < 8) err.password = "Sandi minimal 8 karakter.";
-    setSignupErr(err);
-    if (Object.keys(err).length) return;
-
-    setBusy(true);
-    try {
-      const cleanUsername = signupForm.username.trim().toLowerCase();
-      const taken = await isUsernameTaken(cleanUsername);
-      if (taken) {
-        setSignupErr({ username: "Username sudah terdaftar." });
-        return;
-      }
-      await signUpUser({
-        email: signupForm.email.trim(),
-        username: cleanUsername,
-        password: signupForm.password,
-      });
-      notify(
-        "success",
-        "Pendaftaran berhasil! Cek email kamu untuk konfirmasi, lalu silakan masuk."
-      );
-      setLoginForm({ username: cleanUsername, password: "" });
-      setTab("login");
-    } catch (e2) {
-      setSignupErr({ email: e2.message || "Pendaftaran gagal, coba lagi." });
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  return (
-    <div className="flex items-center justify-center min-h-[640px] px-4 py-10">
-      <div className="w-full max-w-3xl rounded-[28px] shadow-xl overflow-hidden flex flex-col md:flex-row" style={{ background: "white" }}>
-        {/* Diagonal side panel */}
-        <div
-          className="relative md:w-[38%] flex flex-col justify-center items-stretch p-8 gap-3 overflow-hidden"
-          style={{ background: `linear-gradient(160deg, ${C.green} 0%, ${C.blue} 100%)`, minHeight: 260 }}
-        >
-          <div className="absolute -bottom-10 -left-10 w-40 h-40 rounded-full opacity-20" style={{ background: C.yellow }} />
-          <div className="absolute -top-10 -right-6 w-28 h-28 rounded-full opacity-20" style={{ background: "white" }} />
-          <button onClick={onBack} className="relative z-10 flex items-center gap-1 text-white/90 text-xs font-semibold mb-4 w-fit">
-            <ArrowLeft size={14} /> Kembali
-          </button>
-          <button
-            onClick={() => setTab("login")}
-            className="relative z-10 text-left rounded-2xl px-5 py-3 font-head font-bold transition-all"
-            style={{ background: tab === "login" ? "white" : "transparent", color: tab === "login" ? C.green : "white" }}
-          >
-            MASUK
-          </button>
-          <button
-            onClick={() => setTab("signup")}
-            className="relative z-10 text-left rounded-2xl px-5 py-3 font-head font-bold transition-all"
-            style={{ background: tab === "signup" ? "white" : "transparent", color: tab === "signup" ? C.blue : "white" }}
-          >
-            DAFTAR
-          </button>
-        </div>
-
-        {/* Form panel */}
-        <div className="flex-1 p-8 md:p-10">
-          <div className="flex flex-col items-center mb-6">
-            <div className="w-14 h-14 rounded-full flex items-center justify-center mb-3" style={{ background: `linear-gradient(135deg, ${C.green}, ${C.blue})` }}>
-              <User size={26} color="white" />
-            </div>
-            <h2 className="font-head font-bold text-xl" style={{ color: C.ink }}>
-              {tab === "login" ? "Masuk ke Akun" : "Buat Akun Baru"}
-            </h2>
-          </div>
-
-          {tab === "login" ? (
-            <form onSubmit={handleLogin} className="flex flex-col gap-4">
-              <TextInput
-                label="Username" icon={User} value={loginForm.username}
-                onChange={(v) => setLoginForm((f) => ({ ...f, username: v }))}
-                placeholder="cth. budisantoso" error={loginErr.username}
-              />
-              <TextInput
-                label="Sandi" icon={Lock} value={loginForm.password}
-                onChange={(v) => setLoginForm((f) => ({ ...f, password: v }))}
-                placeholder="Minimal 8 karakter" error={loginErr.password}
-                showToggle show={showPass} onToggle={() => setShowPass((s) => !s)}
-              />
-              {loginFailed && (
-                <div className="rounded-xl px-4 py-3 text-sm" style={{ background: C.dangerSoft, color: C.danger }}>
-                  {loginMessage || "Username atau sandi tidak sesuai."}{" "}
-                  <button type="button" onClick={onForgot} className="underline font-semibold">Lupa sandi?</button>
-                </div>
-              )}
-              {!loginFailed && (
-                <button type="button" onClick={onForgot} className="text-sm font-semibold text-right" style={{ color: C.blue }}>
-                  Lupa sandi?
-                </button>
-              )}
-              <PressButton
-                type="submit" disabled={busy}
-                className="rounded-2xl py-3 font-head font-bold text-white mt-1"
-                style={{ background: `linear-gradient(135deg, ${C.green}, ${C.greenDark})`, boxShadow: `0 4px 0 ${C.greenDark}` }}
-              >
-                {busy ? "Memeriksa..." : "Masuk"}
-              </PressButton>
-            </form>
-          ) : (
-            <form onSubmit={handleSignup} className="flex flex-col gap-4">
-              <TextInput
-                label="Email" icon={Mail} type="email" value={signupForm.email}
-                onChange={(v) => setSignupForm((f) => ({ ...f, email: v }))}
-                placeholder="nama@email.com" error={signupErr.email}
-              />
-              <TextInput
-                label="Username" icon={User} value={signupForm.username}
-                onChange={(v) => setSignupForm((f) => ({ ...f, username: v }))}
-                placeholder="cth. budisantoso" error={signupErr.username}
-              />
-              <TextInput
-                label="Sandi" icon={Lock} value={signupForm.password}
-                onChange={(v) => setSignupForm((f) => ({ ...f, password: v }))}
-                placeholder="Minimal 8 karakter" error={signupErr.password}
-                hint={!signupErr.password ? "Gunakan minimal 8 karakter." : undefined}
-                showToggle show={showPass2} onToggle={() => setShowPass2((s) => !s)}
-              />
-              <PressButton
-                type="submit" disabled={busy}
-                className="rounded-2xl py-3 font-head font-bold text-white mt-1"
-                style={{ background: `linear-gradient(135deg, ${C.blue}, ${C.blueDark})`, boxShadow: `0 4px 0 ${C.blueDark}` }}
-              >
-                {busy ? "Mendaftarkan..." : "Daftar"}
-              </PressButton>
-            </form>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/* ------------------------------- Forgot / Reset -------------------------------- */
-function ForgotScreen({ busy, setBusy, notify, onBackToLogin }) {
-  const [email, setEmail] = useState("");
-  const [err, setErr] = useState("");
-  const [sent, setSent] = useState(false);
-
-  async function handleSubmit(e) {
-    e.preventDefault();
-    setErr("");
-    if (!/^\S+@\S+\.\S+$/.test(email)) { setErr("Format email tidak valid."); return; }
-    setBusy(true);
-    try {
-      // Supabase mengirim email reset sandi sungguhan. Demi keamanan (mencegah
-      // orang lain mengecek email mana saja yang terdaftar), kita selalu
-      // menampilkan pesan sukses yang sama, terlepas email ditemukan atau tidak.
-      await requestPasswordReset(email.trim());
-    } catch {
-      /* diamkan; tetap tampilkan pesan generik di bawah */
-    } finally {
-      setBusy(false);
-      setSent(true);
-      notify("info", "Jika email terdaftar, tautan reset telah dikirim.");
-    }
-  }
-
-  return (
-    <Centered>
-      <Card>
-        <BackRow onBack={onBackToLogin} label="Kembali ke Menu Masuk" />
-        <IconBadge icon={KeyRound} />
-        <h2 className="font-head font-bold text-xl text-center mb-1" style={{ color: C.ink }}>Lupa Sandi</h2>
-        <p className="text-sm text-center mb-6" style={{ color: C.inkSoft }}>
-          Masukkan email yang terdaftar. Kami akan kirim tautan untuk mengganti sandi.
-        </p>
-        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-          <TextInput label="Email Terdaftar" icon={Mail} type="email" value={email} onChange={setEmail} placeholder="nama@email.com" error={err} />
-          <PressButton
-            type="submit" disabled={busy}
-            className="rounded-2xl py-3 font-head font-bold text-white"
-            style={{ background: `linear-gradient(135deg, ${C.blue}, ${C.blueDark})`, boxShadow: `0 4px 0 ${C.blueDark}` }}
-          >
-            {busy ? "Mengirim..." : "Kirim Tautan Reset"}
-          </PressButton>
-        </form>
-
-        {sent && (
-          <div className="mt-5 rounded-xl p-4" style={{ background: C.blueSoft }}>
-            <p className="text-sm" style={{ color: C.ink }}>
-              Jika <b>{email}</b> terdaftar, kami telah mengirim tautan reset sandi ke email tersebut.
-              Buka email itu dan klik tautannya untuk lanjut mengganti sandi.
-            </p>
-          </div>
-        )}
-      </Card>
-    </Centered>
-  );
-}
-
-function ResetScreen({ busy, setBusy, notify, onDone, onBackToLogin }) {
-  const [form, setForm] = useState({ password: "", confirm: "" });
-  const [err, setErr] = useState({});
-  const [show, setShow] = useState(false);
-
-  async function handleSubmit(e) {
-    e.preventDefault();
-    const e2 = {};
-    if (form.password.length < 8) e2.password = "Sandi minimal 8 karakter.";
-    if (form.confirm !== form.password) e2.confirm = "Konfirmasi sandi tidak cocok.";
-    setErr(e2);
-    if (Object.keys(e2).length) return;
-
-    setBusy(true);
-    try {
-      // Supabase sudah membuat sesi sementara "PASSWORD_RECOVERY" saat pengguna
-      // membuka tautan dari email, jadi kita cukup panggil updateUser di sini.
-      await updatePasswordAfterRecovery(form.password);
-      onDone();
-    } catch {
-      setErr({ password: "Gagal memperbarui sandi. Tautan mungkin sudah kedaluwarsa." });
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  return (
-    <Centered>
-      <Card>
-        <BackRow onBack={onBackToLogin} label="Kembali ke Menu Masuk" />
-        <IconBadge icon={ShieldCheck} />
-        <h2 className="font-head font-bold text-xl text-center mb-1" style={{ color: C.ink }}>Masukkan Sandi Baru</h2>
-        <p className="text-sm text-center mb-6" style={{ color: C.inkSoft }}>Buat sandi baru untuk akun kamu.</p>
-        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-          <TextInput
-            label="Sandi Baru" icon={Lock} value={form.password}
-            onChange={(v) => setForm((f) => ({ ...f, password: v }))}
-            placeholder="Minimal 8 karakter" error={err.password}
-            showToggle show={show} onToggle={() => setShow((s) => !s)}
-          />
-          <TextInput
-            label="Ulangi Sandi Baru" icon={Lock} value={form.confirm}
-            onChange={(v) => setForm((f) => ({ ...f, confirm: v }))}
-            placeholder="Ulangi sandi baru" error={err.confirm}
-            showToggle show={show} onToggle={() => setShow((s) => !s)}
-          />
-          <PressButton
-            type="submit" disabled={busy}
-            className="rounded-2xl py-3 font-head font-bold text-white"
-            style={{ background: `linear-gradient(135deg, ${C.green}, ${C.greenDark})`, boxShadow: `0 4px 0 ${C.greenDark}` }}
-          >
-            {busy ? "Menyimpan..." : "Simpan Sandi Baru"}
-          </PressButton>
-        </form>
-      </Card>
-    </Centered>
-  );
-}
-
-function ChangePasswordScreen({ user, busy, setBusy, notify, onBack }) {
-  const [form, setForm] = useState({ current: "", next: "", confirm: "" });
-  const [err, setErr] = useState({});
-
-  async function handleSubmit(e) {
-    e.preventDefault();
-    const e2 = {};
-    if (form.next.length < 8) e2.next = "Sandi baru minimal 8 karakter.";
-    if (form.confirm !== form.next) e2.confirm = "Konfirmasi sandi tidak cocok.";
-    setErr(e2);
-    if (Object.keys(e2).length) return;
-
-    setBusy(true);
-    try {
-      await changePassword({
-        email: user.email,
-        currentPassword: form.current,
-        newPassword: form.next,
-      });
-      notify("success", "Sandi berhasil diganti.");
-      onBack();
-    } catch (e3) {
-      setErr({ current: e3.code === "wrong-current-password" ? "Sandi saat ini tidak sesuai." : "Gagal mengganti sandi." });
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  return (
-    <Centered>
-      <Card>
-        <BackRow onBack={onBack} label="Kembali ke Beranda" />
-        <IconBadge icon={KeyRound} />
-        <h2 className="font-head font-bold text-xl text-center mb-6" style={{ color: C.ink }}>Ganti Sandi</h2>
-        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-          <TextInput label="Sandi Saat Ini" icon={Lock} value={form.current} onChange={(v) => setForm((f) => ({ ...f, current: v }))} error={err.current} placeholder="Sandi lama" />
-          <TextInput label="Sandi Baru" icon={Lock} value={form.next} onChange={(v) => setForm((f) => ({ ...f, next: v }))} error={err.next} placeholder="Minimal 8 karakter" />
-          <TextInput label="Ulangi Sandi Baru" icon={Lock} value={form.confirm} onChange={(v) => setForm((f) => ({ ...f, confirm: v }))} error={err.confirm} placeholder="Ulangi sandi baru" />
-          <PressButton
-            type="submit" disabled={busy}
-            className="rounded-2xl py-3 font-head font-bold text-white"
-            style={{ background: `linear-gradient(135deg, ${C.blue}, ${C.blueDark})`, boxShadow: `0 4px 0 ${C.blueDark}` }}
-          >
-            {busy ? "Menyimpan..." : "Simpan Perubahan"}
-          </PressButton>
-        </form>
-      </Card>
-    </Centered>
-  );
-}
-
-/* --------------------------------- Shared bits --------------------------------- */
-function Centered({ children }) {
-  return <div className="flex items-center justify-center min-h-[640px] px-4 py-10">{children}</div>;
-}
-function Card({ children }) {
-  return <div className="w-full max-w-sm rounded-[28px] bg-white shadow-xl p-8">{children}</div>;
-}
-function BackRow({ onBack, label }) {
-  return (
-    <button onClick={onBack} className="flex items-center gap-1 text-xs font-semibold mb-5" style={{ color: C.inkSoft }}>
-      <ArrowLeft size={14} /> {label}
-    </button>
-  );
-}
-function IconBadge({ icon: Icon }) {
-  return (
-    <div className="w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-4" style={{ background: `linear-gradient(135deg, ${C.green}, ${C.blue})` }}>
-      <Icon size={24} color="white" />
-    </div>
-  );
-}
-
-/* ----------------------------------- Home -------------------------------------- */
-function HomeScreen({ user, onLogout, onCekDesil, onChangePassword, onAdmin }) {
-  const [menuOpen, setMenuOpen] = useState(false);
-  const hour = new Date().getHours();
-  const greetTime = hour < 11 ? "Selamat pagi" : hour < 15 ? "Selamat siang" : hour < 18 ? "Selamat sore" : "Selamat malam";
-
-  return (
-    <div className="min-h-[640px]">
-      <nav className="flex items-center justify-between px-6 md:px-10 py-5 border-b" style={{ borderColor: C.line }}>
-        <Logo />
-        <div className="relative">
-          <button onClick={() => setMenuOpen((o) => !o)} className="flex items-center gap-2 rounded-full pl-1 pr-3 py-1 border" style={{ borderColor: C.line }}>
-            <div className="w-8 h-8 rounded-full flex items-center justify-center text-white font-head font-bold text-sm" style={{ background: `linear-gradient(135deg, ${C.green}, ${C.blue})` }}>
-              {user.username?.[0]?.toUpperCase()}
-            </div>
-            <span className="text-sm font-semibold" style={{ color: C.ink }}>{user.username}</span>
-          </button>
-          {menuOpen && (
-            <div className="absolute right-0 mt-2 w-52 rounded-xl bg-white shadow-lg border overflow-hidden z-20" style={{ borderColor: C.line }}>
-              <button onClick={() => { setMenuOpen(false); onChangePassword(); }} className="w-full text-left px-4 py-3 text-sm flex items-center gap-2 hover:bg-gray-50" style={{ color: C.ink }}>
-                <Settings size={16} /> Ganti Sandi
-              </button>
-              <button onClick={onLogout} className="w-full text-left px-4 py-3 text-sm flex items-center gap-2 hover:bg-gray-50" style={{ color: C.danger }}>
-                <LogOut size={16} /> Keluar
-              </button>
-            </div>
-          )}
-        </div>
-      </nav>
-
-      <div className="px-6 md:px-10 py-8 max-w-5xl mx-auto">
-        <div
-          className="rounded-3xl p-8 mb-8 relative overflow-hidden"
-          style={{ background: `linear-gradient(120deg, ${C.green} 0%, ${C.blue} 100%)` }}
-        >
-          <div className="absolute -right-8 -top-8 w-36 h-36 rounded-full opacity-20" style={{ background: C.yellow }} />
-          <p className="text-white/80 text-sm font-medium">{greetTime},</p>
-          <h1 className="font-head font-extrabold text-white text-2xl md:text-3xl mt-1">Halo, {user.username} 👋</h1>
-          <p className="text-white/85 text-sm mt-2 max-w-md">
-            Cek posisi desil keluargamu dan siapkan data untuk pengajuan peninjauan kapan saja.
-          </p>
-        </div>
-
-        <div className="grid sm:grid-cols-2 gap-5">
-          <button onClick={onCekDesil} className="text-left rounded-2xl p-6 border-2 transition-transform hover:-translate-y-0.5" style={{ borderColor: C.line, background: "white" }}>
-            <div className="w-11 h-11 rounded-xl flex items-center justify-center mb-4" style={{ background: C.greenSoft }}>
-              <ClipboardList size={22} color={C.green} />
-            </div>
-            <h3 className="font-head font-bold text-lg" style={{ color: C.ink }}>Cek Desil</h3>
-            <p className="text-sm mt-1" style={{ color: C.inkSoft }}>Isi data keluarga dan lihat indikasi status desil kamu.</p>
-          </button>
-
-          <button onClick={onChangePassword} className="text-left rounded-2xl p-6 border-2 transition-transform hover:-translate-y-0.5" style={{ borderColor: C.line, background: "white" }}>
-            <div className="w-11 h-11 rounded-xl flex items-center justify-center mb-4" style={{ background: C.yellowSoft }}>
-              <Settings size={22} color={C.yellowDark} />
-            </div>
-            <h3 className="font-head font-bold text-lg" style={{ color: C.ink }}>Pengaturan Akun</h3>
-            <p className="text-sm mt-1" style={{ color: C.inkSoft }}>Kelola sandi dan informasi akun kamu.</p>
-          </button>
-
-          {user.role === "admin" && (
-            <button onClick={onAdmin} className="text-left rounded-2xl p-6 border-2 transition-transform hover:-translate-y-0.5" style={{ borderColor: C.line, background: "white" }}>
-              <div className="w-11 h-11 rounded-xl flex items-center justify-center mb-4" style={{ background: C.blueSoft }}>
-                <UsersIcon size={22} color={C.blue} />
-              </div>
-              <h3 className="font-head font-bold text-lg" style={{ color: C.ink }}>Dashboard Admin</h3>
-              <p className="text-sm mt-1" style={{ color: C.inkSoft }}>Lihat data pengajuan dan hasil pendataan warga.</p>
-            </button>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/* -------------------------------- Dashboard Admin ------------------------------ */
-function AdminScreen({ user, notify, onBack }) {
-  const [rows, setRows] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [selected, setSelected] = useState(null);
-
-  useEffect(() => {
-    let active = true;
-    (async () => {
-      try {
-        const data = await getAdminSubmissions();
-        if (active) setRows(data);
-      } catch (e) {
-        notify("error", e?.message || "Data warga gagal dimuat.");
-      } finally {
-        if (active) setLoading(false);
-      }
-    })();
-    return () => { active = false; };
-  }, []);
-
-  return (
-    <div className="min-h-[640px] px-4 py-8">
-      <div className="max-w-5xl mx-auto">
-        <BackRow onBack={onBack} label="Kembali ke Beranda" />
-        <div className="rounded-[28px] bg-white shadow-xl p-8">
-          <div className="flex items-center gap-3 mb-6">
-            <div className="w-11 h-11 rounded-xl flex items-center justify-center" style={{ background: C.blueSoft }}>
-              <UsersIcon size={22} color={C.blue} />
-            </div>
-            <div>
-              <p className="text-xs font-semibold" style={{ color: C.inkSoft }}>Petugas / Admin</p>
-              <h2 className="font-head font-bold text-xl" style={{ color: C.ink }}>Data Pendataan Warga</h2>
-            </div>
-          </div>
-
-          {loading ? (
-            <p className="text-sm" style={{ color: C.inkSoft }}>Memuat data…</p>
-          ) : rows.length === 0 ? (
-            <p className="text-sm" style={{ color: C.inkSoft }}>Belum ada data pendataan warga.</p>
-          ) : (
-            <div className="space-y-3">
-              {rows.map((row) => (
-                <div key={row.id} className="rounded-2xl border p-4" style={{ borderColor: C.line }}>
-                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                    <div>
-                      <p className="font-semibold text-sm" style={{ color: C.ink }}>
-                        {row.data?.namaKK || "Nama belum diisi"}
-                      </p>
-                      <p className="text-xs mt-1" style={{ color: C.inkSoft }}>
-                        {row.indikasi || "Belum ada indikasi"} · Skor {row.score ?? "-"}
-                      </p>
-                    </div>
-                    <button
-                      onClick={() => setSelected(selected?.id === row.id ? null : row)}
-                      className="rounded-xl px-4 py-2 text-sm font-semibold"
-                      style={{ background: C.blueSoft, color: C.blueDark }}
-                    >
-                      {selected?.id === row.id ? "Tutup" : "Lihat Data"}
-                    </button>
-                  </div>
-
-                  {selected?.id === row.id && (
-                    <div className="mt-4 rounded-xl p-4 overflow-auto" style={{ background: C.cream }}>
-                      <p className="text-xs font-bold mb-2" style={{ color: C.ink }}>Detail data</p>
-                      <pre className="text-xs whitespace-pre-wrap break-words" style={{ color: C.inkSoft }}>
-                        {JSON.stringify(row.data, null, 2)}
-                      </pre>
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/* -------------------------------- Cek Desil wizard ------------------------------ */
 const STEPS = [
-  { title: "Data Diri & Kependudukan", icon: UsersIcon, fields: [
-    { key: "nik", label: "NIK (16 digit — gunakan data contoh)", placeholder: "35xxxxxxxxxxxxxx" },
-    { key: "noKK", label: "Nomor Kartu Keluarga", placeholder: "35xxxxxxxxxxxxxx" },
-    { key: "namaKK", label: "Nama Kepala Keluarga", placeholder: "Nama sesuai KK" },
-    { key: "jumlahAnggota", label: "Jumlah Anggota Keluarga", type: "number", placeholder: "4" },
-    { key: "alamat", label: "Alamat (Desa/Kelurahan, Kecamatan, Kab/Kota)", placeholder: "Ds. Sukamaju, Kec. ..., Kab. ...", full: true },
-  ]},
-  { title: "Pekerjaan & Pendapatan", icon: Wallet, fields: [
-    { key: "statusKerja", label: "Status Pekerjaan", type: "select", options: ["Bekerja Tetap", "Bekerja Tidak Tetap/Harian", "Usaha Sendiri", "Tidak Bekerja"] },
-    { key: "pendapatan", label: "Pendapatan Bulanan (Rp)", type: "number", placeholder: "2500000" },
-    { key: "punyaUsaha", label: "Memiliki Usaha/Bisnis", type: "select", options: ["Tidak", "Ya"] },
-    { key: "npwp", label: "Memiliki NPWP", type: "select", options: ["Tidak", "Ya"] },
-  ]},
-  { title: "Aset & Kepemilikan", icon: Car, fields: [
-    { key: "statusRumah", label: "Status Kepemilikan Rumah", type: "select", options: ["Milik Sendiri", "Sewa/Kontrak", "Menumpang"] },
-    { key: "kepemilikanTanah", label: "Kepemilikan Tanah/Sawah", type: "select", options: ["Tidak", "Ya"] },
-    { key: "jumlahMotor", label: "Jumlah Sepeda Motor (+ BPKB)", type: "number", placeholder: "0" },
-    { key: "jumlahMobil", label: "Jumlah Mobil (+ BPKB)", type: "number", placeholder: "0" },
-    { key: "ternak", label: "Kepemilikan Ternak", type: "select", options: ["Tidak", "Ya"] },
-  ]},
-  { title: "Kondisi Tempat Tinggal", icon: HomeIcon, fields: [
-    { key: "lantai", label: "Jenis Lantai", type: "select", options: ["Keramik/Ubin", "Semen", "Tanah"] },
-    { key: "dinding", label: "Jenis Dinding", type: "select", options: ["Tembok", "Setengah Tembok", "Kayu/Bambu"] },
-    { key: "atap", label: "Jenis Atap", type: "select", options: ["Genteng/Beton", "Seng", "Asbes/Rumbia"] },
-    { key: "airMinum", label: "Sumber Air Minum", type: "select", options: ["PDAM/Air Kemasan", "Sumur", "Sungai/Mata Air"] },
-    { key: "sanitasi", label: "Jenis Sanitasi/Jamban", type: "select", options: ["Jamban Pribadi", "Jamban Bersama", "Tidak Ada"] },
-    { key: "bahanBakar", label: "Bahan Bakar Memasak", type: "select", options: ["Gas/Listrik", "Minyak Tanah", "Kayu Bakar"] },
-  ]},
-  { title: "Data Listrik (Meteran Token)", icon: Zap, fields: [
-    { key: "idPelanggan", label: "ID Pelanggan / Nomor Meter PLN", placeholder: "52xxxxxxxxx" },
-    { key: "jenisMeteran", label: "Jenis Meteran", type: "select", options: ["Token (Prabayar)", "Pascabayar"] },
-    { key: "dayaListrik", label: "Daya Terpasang", type: "select", options: ["450 VA", "900 VA", "1300 VA", "2200 VA", "Di atas 2200 VA"] },
-  ]},
-  { title: "Pendidikan", icon: GraduationCap, fields: [
-    { key: "pendidikanKK", label: "Pendidikan Terakhir Kepala Keluarga", type: "select", options: ["Tidak Sekolah", "SD", "SMP", "SMA/SMK", "Diploma/Sarjana"] },
-    { key: "anakSekolah", label: "Jumlah Anak Usia Sekolah", type: "number", placeholder: "0" },
-  ]},
-  { title: "Kesehatan & Disabilitas", icon: HeartPulse, fields: [
-    { key: "sakitKronis", label: "Ada Anggota Keluarga dengan Sakit Kronis", type: "select", options: ["Tidak", "Ya"] },
-    { key: "disabilitas", label: "Ada Anggota Keluarga Disabilitas", type: "select", options: ["Tidak", "Ya"] },
-  ]},
-  { title: "Riwayat Bantuan Sosial", icon: ShieldCheck, fields: [
-    { key: "bansos", label: "Bantuan yang Pernah/Sedang Diterima", type: "select", options: ["Belum Pernah", "PKH", "BPNT/Kartu Sembako", "KIP", "KIS/PBI", "Lainnya"] },
-  ]},
-  { title: "Pengeluaran Rumah Tangga", icon: Wallet, fields: [
-    { key: "pengeluaranPangan", label: "Pengeluaran Pangan per Bulan (Rp)", type: "number", placeholder: "1500000" },
-    { key: "pengeluaranNonPangan", label: "Pengeluaran Non-Pangan per Bulan (Rp)", type: "number", placeholder: "1000000" },
-  ]},
-  { title: "Dokumen Tambahan", icon: FileText, fields: [
-    { key: "skck", label: "SKCK (Opsional)", type: "file", optional: true, accept: ".pdf,.jpg,.jpeg,.png" },
-  ]},
+  {
+    title: "Data Diri & Kependudukan",
+    fields: [
+      ["nik", "NIK", "text", true],
+      ["noKK", "Nomor KK", "text", true],
+      ["namaKK", "Nama Kepala Keluarga", "text", true],
+      ["jumlahAnggota", "Jumlah Anggota Keluarga", "number", true],
+      ["alamat", "Alamat Lengkap", "textarea", true],
+    ],
+  },
+  {
+    title: "Pekerjaan & Pendapatan",
+    fields: [
+      ["statusKerja", "Status Pekerjaan Kepala Keluarga", "text", true],
+      ["pendapatan", "Perkiraan Pendapatan Rumah Tangga per Bulan", "number", true],
+      ["punyaUsaha", "Memiliki Usaha", "select", true, ["Tidak", "Ya"]],
+      ["npwp", "Memiliki NPWP", "select", true, ["Tidak", "Ya"]],
+    ],
+  },
+  {
+    title: "Aset & Kepemilikan",
+    fields: [
+      ["statusRumah", "Status Tempat Tinggal", "select", true, ["Milik sendiri", "Kontrak/sewa", "Menumpang", "Lainnya"]],
+      ["kepemilikanTanah", "Kepemilikan Tanah", "select", true, ["Milik sendiri", "Tidak memiliki", "Lainnya"]],
+      ["jumlahMotor", "Jumlah Sepeda Motor", "number", true],
+      ["jumlahMobil", "Jumlah Mobil", "number", true],
+      ["ternak", "Memiliki Ternak", "select", true, ["Tidak", "Ya"]],
+    ],
+  },
+  {
+    title: "Kondisi Tempat Tinggal",
+    fields: [
+      ["lantai", "Jenis Lantai", "text", true],
+      ["dinding", "Jenis Dinding", "text", true],
+      ["atap", "Jenis Atap", "text", true],
+      ["airMinum", "Sumber Air Minum", "text", true],
+      ["sanitasi", "Kondisi Sanitasi/Jamban", "text", true],
+      ["bahanBakar", "Bahan Bakar Memasak", "text", true],
+    ],
+  },
+  {
+    title: "Data Listrik",
+    fields: [
+      ["idPelanggan", "ID Pelanggan / Nomor Meter", "text", true],
+      ["jenisMeteran", "Jenis Meteran", "select", true, ["Token/prabayar", "Pascabayar"]],
+      ["dayaListrik", "Daya Listrik", "text", true],
+    ],
+  },
+  {
+    title: "Pendidikan",
+    fields: [
+      ["pendidikanKK", "Pendidikan Terakhir Kepala Keluarga", "text", true],
+      ["anakSekolah", "Jumlah Anak yang Sedang Sekolah", "number", true],
+    ],
+  },
+  {
+    title: "Kesehatan & Disabilitas",
+    fields: [
+      ["sakitKronis", "Ada Anggota Keluarga dengan Penyakit Kronis", "select", true, ["Tidak", "Ya"]],
+      ["disabilitas", "Ada Anggota Keluarga dengan Disabilitas", "select", true, ["Tidak", "Ya"]],
+    ],
+  },
+  {
+    title: "Riwayat Bantuan Sosial",
+    fields: [
+      ["bansos", "Bantuan Sosial yang Diterima", "text", true],
+      ["pkh", "Menerima PKH", "select", true, ["Tidak", "Ya"]],
+      ["pkhTahunMulai", "Tahun Mulai Menerima PKH", "number", false],
+    ],
+  },
+  {
+    title: "Pengeluaran Rumah Tangga",
+    fields: [
+      ["pengeluaranPangan", "Perkiraan Pengeluaran Pangan per Bulan", "number", true],
+      ["pengeluaranNonPangan", "Perkiraan Pengeluaran Non-Pangan per Bulan", "number", true],
+    ],
+  },
 ];
 
-function CekDesilScreen({ user, busy, setBusy, notify, onBack }) {
-  const [step, setStep] = useState(0);
-  const [data, setData] = useState({});
-  const [errors, setErrors] = useState({});
-  const [skckFile, setSkckFile] = useState(null);
-  const [result, setResult] = useState(null);
-  const isReview = step === STEPS.length;
-  const current = STEPS[step];
+const FILE_FIELDS = [
+  { key: "kkFile", label: "Kartu Keluarga (KK)", required: true, accept: ".jpg,.jpeg,.png,.pdf" },
+  { key: "stnkBpkbFile", label: "STNK atau BPKB Kendaraan", required: false, accept: ".jpg,.jpeg,.png,.pdf" },
+  { key: "salaryFile", label: "Bukti Penghasilan/Gaji", required: false, accept: ".jpg,.jpeg,.png,.pdf" },
+  { key: "electricityFile", label: "Bukti Listrik / Token", required: true, accept: ".jpg,.jpeg,.png,.pdf" },
+  { key: "houseFrontFile", label: "Foto Tampak Depan Rumah", required: true, accept: ".jpg,.jpeg,.png" },
+  { key: "livingRoomFile", label: "Foto Ruang Keluarga/Ruang Tamu", required: true, accept: ".jpg,.jpeg,.png" },
+  { key: "kitchenFile", label: "Foto Dapur", required: true, accept: ".jpg,.jpeg,.png" },
+  { key: "bansosEvidenceFile", label: "Bukti Bantuan Sosial Lainnya", required: false, accept: ".jpg,.jpeg,.png,.pdf" },
+];
 
-  function setField(key, value) {
-    setData((d) => ({ ...d, [key]: value }));
-    setErrors((e) => ({ ...e, [key]: undefined }));
+const emptyData = {
+  nik: "",
+  noKK: "",
+  namaKK: "",
+  jumlahAnggota: "",
+  alamat: "",
+  statusKerja: "",
+  pendapatan: "",
+  punyaUsaha: "Tidak",
+  npwp: "Tidak",
+  statusRumah: "Milik sendiri",
+  kepemilikanTanah: "Milik sendiri",
+  jumlahMotor: "0",
+  jumlahMobil: "0",
+  ternak: "Tidak",
+  lantai: "",
+  dinding: "",
+  atap: "",
+  airMinum: "",
+  sanitasi: "",
+  bahanBakar: "",
+  idPelanggan: "",
+  jenisMeteran: "Token/prabayar",
+  dayaListrik: "",
+  pendidikanKK: "",
+  anakSekolah: "0",
+  sakitKronis: "Tidak",
+  disabilitas: "Tidak",
+  bansos: "",
+  pkh: "Tidak",
+  pkhTahunMulai: "",
+  pengeluaranPangan: "",
+  pengeluaranNonPangan: "",
+};
+
+function maskNumber(value) {
+  if (!value) return "-";
+  const text = String(value);
+  if (text.length <= 4) return "****";
+  return `${text.slice(0, 2)}${"*".repeat(Math.max(2, text.length - 4))}${text.slice(-2)}`;
+}
+
+function InputField({ field, value, onChange }) {
+  const [key, label, type, required, options] = field;
+  const common = {
+    value: value ?? "",
+    onChange: (e) => onChange(key, e.target.value),
+    className:
+      "w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100",
+  };
+
+  return (
+    <label className="block">
+      <span className="mb-2 block text-sm font-medium text-slate-700">
+        {label} {required && <span className="text-red-500">*</span>}
+      </span>
+      {type === "textarea" ? (
+        <textarea {...common} rows={3} />
+      ) : type === "select" ? (
+        <select {...common}>
+          {options.map((option) => <option key={option}>{option}</option>)}
+        </select>
+      ) : (
+        <input {...common} type={type} min={type === "number" ? "0" : undefined} />
+      )}
+    </label>
+  );
+}
+
+function FileBox({ config, file, onChange, disabled }) {
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-white p-4">
+      <p className="font-semibold text-slate-800">
+        {config.label}{" "}
+        {config.required ? <span className="text-red-500">*</span> : <span className="text-slate-400">(opsional)</span>}
+      </p>
+      <p className="mt-1 text-xs text-slate-500">
+        {config.accept.includes("pdf") ? "JPG, PNG, atau PDF" : "JPG atau PNG"}
+      </p>
+      <label className="mt-3 flex cursor-pointer items-center justify-center rounded-xl border-2 border-dashed border-slate-200 px-4 py-5 text-sm text-slate-500 hover:border-blue-400 hover:bg-blue-50">
+        <input
+          type="file"
+          className="hidden"
+          accept={config.accept}
+          disabled={disabled}
+          onChange={(e) => onChange(config.key, e.target.files?.[0] || null)}
+        />
+        {file ? (
+          <span className="flex items-center gap-2 text-green-700">
+            <CheckCircle2 size={18} /> {file.name}
+          </span>
+        ) : (
+          <span className="flex items-center gap-2"><Upload size={18} /> Klik untuk memilih file</span>
+        )}
+      </label>
+    </div>
+  );
+}
+
+function AuthScreen({ mode, setMode, onSuccess }) {
+  const [username, setUsername] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  const submitLogin = async (e) => {
+    e.preventDefault();
+    setError(""); setMessage(""); setSaving(true);
+    try {
+      await signInWithUsername({ username, password });
+      const profile = await getCurrentProfile();
+      onSuccess(profile);
+    } catch (err) {
+      setError(err?.message || "Username atau password tidak sesuai.");
+    } finally { setSaving(false); }
+  };
+
+  const submitRegister = async (e) => {
+    e.preventDefault();
+    setError(""); setMessage(""); setSaving(true);
+    try {
+      if (!username.trim() || !email.trim() || password.length < 6) {
+        throw new Error("Username, email, dan password minimal 6 karakter wajib diisi.");
+      }
+      await signUpUser({ email, username, password });
+      setMessage("Pendaftaran berhasil. Silakan cek email jika verifikasi email diaktifkan, lalu masuk.");
+      setMode("login");
+    } catch (err) {
+      setError(err?.message || "Pendaftaran gagal.");
+    } finally { setSaving(false); }
+  };
+
+  const submitForgot = async (e) => {
+    e.preventDefault();
+    setError(""); setMessage(""); setSaving(true);
+    try {
+      await requestPasswordReset(email);
+      setMessage("Tautan pemulihan password telah dikirim ke email jika akun tersebut terdaftar.");
+    } catch (err) {
+      setError(err?.message || "Permintaan pemulihan gagal.");
+    } finally { setSaving(false); }
+  };
+
+  const submitReset = async (e) => {
+    e.preventDefault();
+    setError(""); setMessage(""); setSaving(true);
+    try {
+      if (newPassword.length < 6) throw new Error("Password baru minimal 6 karakter.");
+      await updatePasswordAfterRecovery(newPassword);
+      setMessage("Password berhasil diperbarui. Silakan masuk kembali.");
+      setMode("login");
+    } catch (err) {
+      setError(err?.message || "Password gagal diperbarui.");
+    } finally { setSaving(false); }
+  };
+
+  const title = mode === "login" ? "Masuk ke Desilku" : mode === "register" ? "Buat Akun Warga" : mode === "forgot" ? "Lupa Password" : "Buat Password Baru";
+
+  return (
+    <div className="min-h-screen bg-slate-50 px-4 py-10">
+      <div className="mx-auto max-w-md">
+        <div className="mb-7 text-center">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-600 text-white shadow-sm">
+            <Home size={28} />
+          </div>
+          <h1 className="mt-4 text-2xl font-bold text-slate-900">Desilku</h1>
+          <p className="mt-1 text-sm text-slate-500">Pemutakhiran Data Sosial Ekonomi</p>
+        </div>
+
+        <div className="rounded-3xl bg-white p-6 shadow-sm sm:p-8">
+          <h2 className="text-xl font-bold text-slate-900">{title}</h2>
+          <p className="mt-2 text-sm text-slate-500">
+            {mode === "login" ? "Masuk menggunakan username dan password akun warga." :
+             mode === "register" ? "Daftarkan akun untuk mengajukan pemutakhiran data." :
+             mode === "forgot" ? "Masukkan email akun untuk menerima tautan pemulihan." :
+             "Masukkan password baru untuk akunmu."}
+          </p>
+
+          {error && <div className="mt-5 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</div>}
+          {message && <div className="mt-5 rounded-xl border border-green-200 bg-green-50 p-3 text-sm text-green-700">{message}</div>}
+
+          <form className="mt-6 space-y-4" onSubmit={mode === "login" ? submitLogin : mode === "register" ? submitRegister : mode === "forgot" ? submitForgot : submitReset}>
+            {mode !== "reset" && mode !== "forgot" && (
+              <label className="block">
+                <span className="mb-2 block text-sm font-medium text-slate-700">Username</span>
+                <input value={username} onChange={(e) => setUsername(e.target.value)} className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100" required />
+              </label>
+            )}
+
+            {mode === "register" && (
+              <label className="block">
+                <span className="mb-2 block text-sm font-medium text-slate-700">Email</span>
+                <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100" required />
+              </label>
+            )}
+
+            {mode === "forgot" && (
+              <label className="block">
+                <span className="mb-2 block text-sm font-medium text-slate-700">Email</span>
+                <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100" required />
+              </label>
+            )}
+
+            {mode === "login" || mode === "register" ? (
+              <label className="block">
+                <span className="mb-2 block text-sm font-medium text-slate-700">Password</span>
+                <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100" required />
+              </label>
+            ) : null}
+
+            {mode === "reset" && (
+              <label className="block">
+                <span className="mb-2 block text-sm font-medium text-slate-700">Password Baru</span>
+                <input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100" required />
+              </label>
+            )}
+
+            <button disabled={saving} className="w-full rounded-xl bg-blue-600 px-5 py-3 font-semibold text-white hover:bg-blue-700 disabled:opacity-60">
+              {saving ? "Memproses..." : mode === "login" ? "Masuk" : mode === "register" ? "Daftar" : mode === "forgot" ? "Kirim Tautan" : "Simpan Password"}
+            </button>
+          </form>
+
+          <div className="mt-6 text-center text-sm">
+            {mode === "login" && (
+              <>
+                <button onClick={() => { setMode("forgot"); setError(""); setMessage(""); }} className="text-blue-600 hover:underline">Lupa password?</button>
+                <p className="mt-3 text-slate-500">Belum punya akun? <button onClick={() => setMode("register")} className="font-semibold text-blue-600">Daftar</button></p>
+              </>
+            )}
+            {mode !== "login" && (
+              <button onClick={() => { setMode("login"); setError(""); setMessage(""); }} className="font-semibold text-blue-600 hover:underline">
+                Kembali ke halaman masuk
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function App() {
+  const [user, setUser] = useState(null);
+  const [loadingProfile, setLoadingProfile] = useState(true);
+  const [authMode, setAuthMode] = useState("login");
+  const [screen, setScreen] = useState("home");
+  const [step, setStep] = useState(0);
+  const [formData, setFormData] = useState(emptyData);
+  const [files, setFiles] = useState({});
+  const [errors, setErrors] = useState({});
+  const [receipt, setReceipt] = useState(null);
+  const [saving, setSaving] = useState(false);
+  const [notice, setNotice] = useState("");
+
+  useEffect(() => {
+    getCurrentProfile()
+      .then(setUser)
+      .catch(() => setUser(null))
+      .finally(() => setLoadingProfile(false));
+
+    if (window.location.pathname === "/reset-password") setAuthMode("reset");
+  }, []);
+
+  const progress = useMemo(() => Math.round(((step + 1) / STEPS.length) * 100), [step]);
+
+  function updateField(key, value) {
+    setFormData((prev) => ({ ...prev, [key]: value }));
+    setErrors((prev) => ({ ...prev, [key]: "" }));
+  }
+
+  function updateFile(key, file) {
+    setFiles((prev) => ({ ...prev, [key]: file }));
+    setErrors((prev) => ({ ...prev, [key]: "" }));
   }
 
   function validateStep() {
-    const e = {};
-    current.fields.forEach((f) => {
-      if (f.optional) return;
-      if (!data[f.key]) e[f.key] = "Wajib diisi.";
+    const current = STEPS[step];
+    const nextErrors = {};
+    current.fields.forEach(([key, , , required]) => {
+      if (required && !String(formData[key] ?? "").trim()) nextErrors[key] = "Bagian ini wajib diisi.";
     });
-    setErrors(e);
-    return Object.keys(e).length === 0;
-  }
-
-  function next() {
-    if (!isReview && !validateStep()) return;
-    setStep((s) => Math.min(s + 1, STEPS.length));
-  }
-  function back() {
-    if (step === 0) onBack();
-    else setStep((s) => s - 1);
-  }
-
-  async function submit() {
-    setBusy(true);
-    let score = 50;
-    if (data.pendapatan) score -= Math.min(30, Number(data.pendapatan) / 200000);
-    if (data.statusRumah === "Milik Sendiri") score -= 5;
-    if (data.dayaListrik === "450 VA" || data.dayaListrik === "900 VA") score -= 5;
-    if (Number(data.jumlahMobil) > 0) score += 15;
-    if (data.sakitKronis === "Ya" || data.disabilitas === "Ya") score -= 5;
-    if (Number(data.pengeluaranPangan) + Number(data.pengeluaranNonPangan) > 7500000) score += 5;
-    score = Math.max(1, Math.min(100, Math.round(score)));
-    const indikasi = score < 35 ? "Cenderung Desil Rendah (1–3)" : score < 65 ? "Cenderung Desil Menengah (4–7)" : "Cenderung Desil Tinggi (8–10)";
-
-    const summary = { indikasi, score, namaKK: data.namaKK || "-" };
-    try {
-      await saveDesilSubmission(user.id, { formData: data, score, indikasi, skckFile });
-      setResult(summary);
-      notify("success", "Data berhasil disimpan.");
-    } catch {
-      notify("error", "Gagal menyimpan data. Coba lagi.");
-    } finally {
-      setBusy(false);
+    if (step === 7 && formData.pkh === "Ya" && !String(formData.pkhTahunMulai).trim()) {
+      nextErrors.pkhTahunMulai = "Tahun mulai PKH wajib diisi jika menerima PKH.";
     }
+    setErrors(nextErrors);
+    return Object.keys(nextErrors).length === 0;
   }
 
-  if (result) {
+  function validateFiles() {
+    const nextErrors = {};
+    FILE_FIELDS.forEach((item) => {
+      if (item.required && !files[item.key]) nextErrors[item.key] = "Dokumen/foto ini wajib diunggah.";
+    });
+    if ((Number(formData.jumlahMotor) > 0 || Number(formData.jumlahMobil) > 0) && !files.stnkBpkbFile) {
+      nextErrors.stnkBpkbFile = "Karena keluarga memiliki kendaraan, STNK/BPKB perlu diunggah.";
+    }
+    setErrors(nextErrors);
+    return Object.keys(nextErrors).length === 0;
+  }
+
+  async function submitApplication() {
+    setNotice("");
+    if (!validateFiles()) return;
+    setSaving(true);
+    try {
+      const result = await saveDataUpdateSubmission(user?.id, { formData, files });
+      setReceipt(result);
+      setScreen("receipt");
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    } catch (error) {
+      console.error(error);
+      setNotice(error?.message || "Pengajuan gagal dikirim. Silakan coba lagi.");
+    } finally { setSaving(false); }
+  }
+
+  async function logout() {
+    try { await signOutUser(); window.location.reload(); }
+    catch (error) { console.error(error); }
+  }
+
+  if (loadingProfile) {
+    return <div className="min-h-screen bg-slate-50 flex items-center justify-center text-slate-500">Memuat akun...</div>;
+  }
+
+  if (!user) {
+    return <AuthScreen mode={authMode} setMode={setAuthMode} onSuccess={setUser} />;
+  }
+
+  if (screen === "receipt") {
     return (
-      <Centered>
-        <div className="w-full max-w-lg rounded-[28px] bg-white shadow-xl p-8">
-          <IconBadge icon={CheckCircle2} />
-          <h2 className="font-head font-bold text-xl text-center mb-1" style={{ color: C.ink }}>Data Tersimpan</h2>
-          <p className="text-sm text-center mb-6" style={{ color: C.inkSoft }}>Berikut indikasi awal berdasarkan data yang kamu isi.</p>
-
-          <div className="rounded-2xl p-5 mb-5 text-center" style={{ background: C.greenSoft }}>
-            <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: C.inkSoft }}>Indikasi Sementara</p>
-            <p className="font-head font-extrabold text-2xl mt-1" style={{ color: C.green }}>{result.indikasi}</p>
-            <p className="text-xs mt-2" style={{ color: C.inkSoft }}>
-              *Ini estimasi indikatif untuk gambaran awal, bukan hasil resmi BPS/DTSEN.
-            </p>
+      <div className="min-h-screen bg-slate-50 px-4 py-8">
+        <div className="mx-auto max-w-2xl">
+          <div className="rounded-3xl bg-white p-6 shadow-sm sm:p-8">
+            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-green-100 text-green-600"><FileCheck2 size={34} /></div>
+            <h1 className="mt-5 text-center text-2xl font-bold text-slate-900">Pengajuan Berhasil Dikirim</h1>
+            <p className="mt-2 text-center text-sm text-slate-500">Simpan bukti pengajuan ini. Pengajuan akan diperiksa oleh petugas.</p>
+            <div className="mt-6 rounded-2xl bg-slate-50 p-5">
+              <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Nomor Pengajuan</p>
+              <p className="mt-1 text-2xl font-bold text-blue-700">{receipt?.nomorPengajuan || "-"}</p>
+              <div className="mt-5 grid gap-4 text-sm sm:grid-cols-2">
+                <div><p className="text-slate-500">Nama Kepala Keluarga</p><p className="font-semibold text-slate-800">{formData.namaKK}</p></div>
+                <div><p className="text-slate-500">Tanggal</p><p className="font-semibold text-slate-800">{receipt?.tanggal || new Date().toLocaleDateString("id-ID")}</p></div>
+                <div><p className="text-slate-500">NIK</p><p className="font-semibold text-slate-800">{maskNumber(formData.nik)}</p></div>
+                <div><p className="text-slate-500">Nomor KK</p><p className="font-semibold text-slate-800">{maskNumber(formData.noKK)}</p></div>
+                <div className="sm:col-span-2"><p className="text-slate-500">Jenis Pengajuan</p><p className="font-semibold text-slate-800">Pemutakhiran Data Sosial Ekonomi</p></div>
+                <div className="sm:col-span-2"><p className="text-slate-500">Status</p><p className="font-semibold text-amber-700">Menunggu Verifikasi</p></div>
+              </div>
+            </div>
+            <div className="mt-5 rounded-2xl border border-blue-100 bg-blue-50 p-4 text-sm leading-6 text-blue-900">
+              <strong>Catatan:</strong> Pengajuan ini merupakan penyampaian data dan bukti untuk proses pemutakhiran/verifikasi. Pengiriman pengajuan <strong>tidak otomatis mengubah desil resmi</strong>. Penetapan dan pembaruan data tetap mengikuti proses verifikasi oleh pihak yang berwenang.
+            </div>
+            <button onClick={() => { setScreen("home"); setFormData(emptyData); setFiles({}); setStep(0); setReceipt(null); }} className="mt-6 w-full rounded-xl bg-blue-600 px-5 py-3 font-semibold text-white hover:bg-blue-700">Kembali ke Beranda</button>
           </div>
-
-          <div className="rounded-2xl p-5 mb-6 border" style={{ borderColor: C.line }}>
-            <p className="font-head font-bold text-sm mb-3" style={{ color: C.ink }}>Langkah Selanjutnya untuk Peninjauan Resmi</p>
-            <ul className="text-sm space-y-2" style={{ color: C.inkSoft }}>
-              <li className="flex gap-2"><Sparkles size={16} className="shrink-0 mt-0.5" style={{ color: C.yellowDark }} />Ajukan pembaruan lewat RT/RW, Desa/Kelurahan, atau aplikasi Cek Bansos.</li>
-              <li className="flex gap-2"><Sparkles size={16} className="shrink-0 mt-0.5" style={{ color: C.yellowDark }} />Data akan diverifikasi petugas dan dibahas dalam Musyawarah Desa/Kelurahan.</li>
-              <li className="flex gap-2"><Sparkles size={16} className="shrink-0 mt-0.5" style={{ color: C.yellowDark }} />Hasil verifikasi disinkronkan ke DTSEN oleh BPS setiap tiga bulan.</li>
-            </ul>
-          </div>
-
-          <PressButton
-            onClick={onBack}
-            className="rounded-2xl py-3 font-head font-bold text-white w-full"
-            style={{ background: `linear-gradient(135deg, ${C.green}, ${C.greenDark})`, boxShadow: `0 4px 0 ${C.greenDark}` }}
-          >
-            Kembali ke Beranda
-          </PressButton>
         </div>
-      </Centered>
+      </div>
+    );
+  }
+
+  if (screen === "form") {
+    const current = STEPS[step];
+    return (
+      <div className="min-h-screen bg-slate-50">
+        <header className="border-b bg-white">
+          <div className="mx-auto flex max-w-4xl items-center justify-between px-4 py-4">
+            <button onClick={() => setScreen("home")} className="flex items-center gap-2 text-sm font-medium text-slate-600"><ArrowLeft size={18} /> Kembali</button>
+            <div className="text-right"><p className="text-xs text-slate-500">Langkah</p><p className="font-bold text-slate-800">{step + 1} dari {STEPS.length}</p></div>
+          </div>
+          <div className="h-1 bg-slate-100"><div className="h-1 bg-blue-600 transition-all" style={{ width: `${progress}%` }} /></div>
+        </header>
+        <main className="mx-auto max-w-4xl px-4 py-7">
+          <p className="text-sm font-medium text-blue-600">Pemutakhiran Data Sosial Ekonomi</p>
+          <h1 className="mt-1 text-2xl font-bold text-slate-900">{current.title}</h1>
+          <p className="mt-2 text-sm text-slate-500">Isi sesuai kondisi sebenarnya. Data dan dokumen digunakan untuk proses pemeriksaan.</p>
+
+          <div className="mt-6 grid gap-4 rounded-3xl bg-white p-5 shadow-sm sm:p-7">
+            {current.fields.map((field) => (
+              <div key={field[0]}>
+                <InputField field={field} value={formData[field[0]]} onChange={updateField} />
+                {errors[field[0]] && <p className="mt-1 text-xs text-red-600">{errors[field[0]]}</p>}
+              </div>
+            ))}
+          </div>
+
+          {step === 7 && formData.pkh === "Ya" && <p className="mt-3 rounded-xl bg-blue-50 p-3 text-sm text-blue-800">Tahun mulai menerima PKH digunakan sebagai informasi riwayat bantuan.</p>}
+
+          {step === STEPS.length - 1 && (
+            <div className="mt-5 rounded-3xl bg-white p-5 shadow-sm sm:p-7">
+              <h2 className="flex items-center gap-2 text-lg font-bold text-slate-900"><Upload size={21} className="text-blue-600" /> Dokumen & Bukti Pendukung</h2>
+              <p className="mt-2 text-sm text-slate-500">Unggah dokumen yang diminta. Dokumen sensitif diproses sebagai bagian dari pengajuan.</p>
+              <div className="mt-5 grid gap-4">
+                {FILE_FIELDS.map((config) => (
+                  <div key={config.key}>
+                    <FileBox config={config} file={files[config.key]} onChange={updateFile} disabled={saving} />
+                    {errors[config.key] && <p className="mt-1 text-xs text-red-600">{errors[config.key]}</p>}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {notice && <div className="mt-5 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">{notice}</div>}
+
+          <div className="mt-6 flex justify-between gap-3">
+            <button onClick={() => setStep((v) => Math.max(0, v - 1))} disabled={step === 0 || saving} className="rounded-xl border border-slate-200 bg-white px-5 py-3 font-semibold text-slate-700 disabled:opacity-40"><span className="flex items-center gap-2"><ArrowLeft size={18} /> Sebelumnya</span></button>
+            {step < STEPS.length - 1 ? (
+              <button onClick={() => { if (validateStep()) setStep((v) => v + 1); }} disabled={saving} className="rounded-xl bg-blue-600 px-5 py-3 font-semibold text-white hover:bg-blue-700"><span className="flex items-center gap-2">Berikutnya <ArrowRight size={18} /></span></button>
+            ) : (
+              <button onClick={submitApplication} disabled={saving} className="rounded-xl bg-green-600 px-5 py-3 font-semibold text-white hover:bg-green-700 disabled:opacity-60">{saving ? "Mengirim..." : "Kirim Pengajuan"}</button>
+            )}
+          </div>
+        </main>
+      </div>
     );
   }
 
   return (
-    <div className="min-h-[640px] px-4 py-8">
-      <div className="max-w-2xl mx-auto">
-        <BackRow onBack={back} label={step === 0 ? "Kembali ke Beranda" : "Langkah Sebelumnya"} />
+    <div className="min-h-screen bg-slate-50">
+      <header className="border-b bg-white">
+        <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-4">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-600 text-white"><Home size={21} /></div>
+            <div><p className="font-bold text-slate-900">Desilku</p><p className="text-xs text-slate-500">Pemutakhiran Data Sosial Ekonomi</p></div>
+          </div>
+          <button onClick={logout} className="flex items-center gap-2 text-sm text-slate-600 hover:text-red-600"><LogOut size={17} /> Keluar</button>
+        </div>
+      </header>
 
-        <div className="flex items-center gap-1.5 mb-6">
-          {STEPS.map((_, i) => (
-            <div key={i} className="h-1.5 rounded-full flex-1" style={{ background: i <= step || isReview ? C.green : C.line }} />
+      <main className="mx-auto max-w-5xl px-4 py-8">
+        <div className="rounded-3xl bg-gradient-to-br from-blue-700 to-blue-500 p-6 text-white shadow-sm sm:p-8">
+          <p className="text-sm font-medium text-blue-100">Halo{user?.username ? `, ${user.username}` : ""} 👋</p>
+          <h1 className="mt-2 max-w-2xl text-3xl font-bold leading-tight">Ajukan Pemutakhiran Data Sosial Ekonomi dengan lebih mudah</h1>
+          <p className="mt-3 max-w-2xl text-sm leading-6 text-blue-50">Isi data keluarga, unggah bukti pendukung, lalu pantau proses pemeriksaan pengajuanmu.</p>
+          <button onClick={() => { setScreen("form"); setStep(0); setNotice(""); }} className="mt-6 rounded-xl bg-white px-5 py-3 font-bold text-blue-700 hover:bg-blue-50">Mulai Pengajuan</button>
+        </div>
+
+        <div className="mt-6 grid gap-4 sm:grid-cols-3">
+          {[
+            [ClipboardList, "Isi Data", "Lengkapi kondisi sosial ekonomi keluarga."],
+            [FileText, "Upload Bukti", "Lampirkan dokumen dan foto pendukung."],
+            [FileCheck2, "Tunggu Verifikasi", "Pantau status setelah pengajuan dikirim."],
+          ].map(([Icon, title, text]) => (
+            <div key={title} className="rounded-2xl bg-white p-5 shadow-sm"><Icon className="text-blue-600" size={24} /><h2 className="mt-3 font-bold text-slate-900">{title}</h2><p className="mt-1 text-sm leading-6 text-slate-500">{text}</p></div>
           ))}
         </div>
 
-        <div className="rounded-[28px] bg-white shadow-xl p-8">
-          {!isReview ? (
-            <>
-              <div className="flex items-center gap-3 mb-1">
-                <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: C.greenSoft }}>
-                  <current.icon size={20} color={C.green} />
-                </div>
-                <div>
-                  <p className="text-xs font-semibold" style={{ color: C.inkSoft }}>Langkah {step + 1} dari {STEPS.length}</p>
-                  <h2 className="font-head font-bold text-lg" style={{ color: C.ink }}>{current.title}</h2>
-                </div>
-              </div>
-
-              <div className="grid sm:grid-cols-2 gap-4 mt-6">
-                {current.fields.map((f) => (
-                  <div key={f.key} className={f.full ? "sm:col-span-2" : ""}>
-                    <label className="block text-sm font-semibold mb-1.5" style={{ color: C.ink }}>{f.label}</label>
-                    {f.type === "select" ? (
-                      <select
-                        value={data[f.key] || ""}
-                        onChange={(e) => setField(f.key, e.target.value)}
-                        className="w-full rounded-xl border-2 py-2.5 px-4 text-sm bg-white"
-                        style={{ borderColor: errors[f.key] ? C.danger : C.line, color: C.ink }}
-                      >
-                        <option value="" disabled>Pilih salah satu</option>
-                        {f.options.map((o) => <option key={o} value={o}>{o}</option>)}
-                      </select>
-                    ) : f.type === "file" ? (
-                      <div>
-                        <label className="flex items-center gap-3 w-full rounded-xl border-2 border-dashed px-4 py-3 cursor-pointer hover:bg-gray-50" style={{ borderColor: errors[f.key] ? C.danger : C.line }}>
-                          <Upload size={18} style={{ color: C.blue }} />
-                          <span className="text-sm" style={{ color: C.inkSoft }}>
-                            {skckFile ? skckFile.name : "Pilih file SKCK (PDF/JPG/PNG)"}
-                          </span>
-                          <input
-                            type="file"
-                            accept={f.accept}
-                            className="hidden"
-                            onChange={(e) => {
-                              const file = e.target.files?.[0] || null;
-                              setSkckFile(file);
-                              setErrors((x) => ({ ...x, [f.key]: undefined }));
-                            }}
-                          />
-                        </label>
-                        <p className="text-xs mt-1" style={{ color: C.inkSoft }}>
-                          Opsional. Jika tidak punya/tidak ingin melampirkan SKCK, langsung klik Lanjut.
-                        </p>
-                      </div>
-                    ) : (
-                      <input
-                        type={f.type || "text"}
-                        value={data[f.key] || ""}
-                        onChange={(e) => setField(f.key, e.target.value)}
-                        placeholder={f.placeholder}
-                        className="w-full rounded-xl border-2 py-2.5 px-4 text-sm bg-white"
-                        style={{ borderColor: errors[f.key] ? C.danger : C.line, color: C.ink }}
-                      />
-                    )}
-                    {errors[f.key] && <p className="text-xs mt-1 font-medium" style={{ color: C.danger }}>{errors[f.key]}</p>}
-                  </div>
-                ))}
-              </div>
-            </>
-          ) : (
-            <>
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: C.yellowSoft }}>
-                  <FileText size={20} color={C.yellowDark} />
-                </div>
-                <h2 className="font-head font-bold text-lg" style={{ color: C.ink }}>Tinjau Data Sebelum Kirim</h2>
-              </div>
-              <div className="max-h-80 overflow-y-auto pr-1 space-y-4">
-                {STEPS.map((s) => (
-                  <div key={s.title}>
-                    <p className="text-xs font-bold uppercase tracking-wide mb-1.5" style={{ color: C.green }}>{s.title}</p>
-                    <div className="grid sm:grid-cols-2 gap-x-4 gap-y-1 text-sm">
-                      {s.fields.map((f) => (
-                        <p key={f.key} style={{ color: C.inkSoft }}>
-                          <span style={{ color: C.ink }}>{f.label}:</span>{" "}
-                          {f.type === "file"
-                            ? (skckFile?.name || "Tidak dilampirkan")
-                            : (data[f.key] || "-")}
-                        </p>
-                      ))}
-                    </div>
-                  </div>
-                ))}
-              </div>
-              <p className="text-xs mt-4" style={{ color: C.inkSoft }}>
-                Prototipe demo — jangan gunakan NIK/KK/data pribadi asli.
-              </p>
-            </>
-          )}
-
-          <div className="flex gap-3 mt-8">
-            {!isReview && step > 0 && (
-              <PressButton onClick={() => setStep((s) => s - 1)} className="rounded-2xl py-3 px-5 font-head font-bold flex items-center gap-1" style={{ background: C.cream, color: C.ink, boxShadow: `0 3px 0 ${C.line}` }}>
-                <ChevronLeft size={16} /> Kembali
-              </PressButton>
-            )}
-            {!isReview ? (
-              <PressButton onClick={next} full className="rounded-2xl py-3 font-head font-bold text-white flex items-center justify-center gap-1" style={{ background: `linear-gradient(135deg, ${C.blue}, ${C.blueDark})`, boxShadow: `0 4px 0 ${C.blueDark}` }}>
-                Lanjut <ChevronRight size={16} />
-              </PressButton>
-            ) : (
-              <>
-                <PressButton onClick={() => setStep(STEPS.length - 1)} className="rounded-2xl py-3 px-5 font-head font-bold flex items-center gap-1" style={{ background: C.cream, color: C.ink, boxShadow: `0 3px 0 ${C.line}` }}>
-                  <ChevronLeft size={16} /> Ubah
-                </PressButton>
-                <PressButton onClick={submit} disabled={busy} full className="rounded-2xl py-3 font-head font-bold text-white" style={{ background: `linear-gradient(135deg, ${C.green}, ${C.greenDark})`, boxShadow: `0 4px 0 ${C.greenDark}` }}>
-                  {busy ? "Mengirim..." : "Kirim & Cek Indikasi Desil"}
-                </PressButton>
-              </>
-            )}
-          </div>
+        <div className="mt-6 rounded-2xl border border-amber-100 bg-amber-50 p-5 text-sm leading-6 text-amber-900">
+          <strong>Penting:</strong> Desil resmi tidak dihitung oleh aplikasi ini. Data yang kamu kirim menjadi bahan pengajuan pemutakhiran dan akan melalui pemeriksaan/verifikasi oleh petugas sesuai kewenangan.
         </div>
-      </div>
+
+        <div className="mt-6 rounded-2xl bg-white p-5 shadow-sm">
+          <div className="flex items-start gap-3"><User className="mt-0.5 text-blue-600" size={21} /><div><h2 className="font-bold text-slate-900">Data akun</h2><p className="mt-1 text-sm text-slate-500">{user?.email || "Akun warga"}</p></div></div>
+        </div>
+      </main>
     </div>
   );
 }
+
+export default App;
