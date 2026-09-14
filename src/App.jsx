@@ -20,12 +20,17 @@ const COLORS = {
 
 const STEPS = [
   { title: "Data Diri & Kependudukan", short: "Data Diri", icon: UserRound, color: "blue", fields: [
+    ["jenisPengajuan", "Jenis Pengajuan", "select", true, ["Pemutakhiran Data Sosial Ekonomi", "Pengajuan Penurunan Desil"]],
+    ["desilSebelumnya", "Desil saat ini menurut data resmi", "select", false, ["", "Desil 1", "Desil 2", "Desil 3", "Desil 4", "Desil 5", "Desil 6", "Desil 7", "Desil 8", "Desil 9", "Desil 10"]],
     ["namaLengkap", "Nama Lengkap", "text", true],
     ["statusDalamKeluarga", "Sebagai Apa?", "select", true, ["Kepala Keluarga", "Suami/Istri", "Anak", "Anggota Keluarga Lainnya"]],
     ["namaKK", "Nama Kepala Keluarga", "text", true],
     ["nik", "NIK", "text", true], ["noKK", "Nomor KK", "text", true],
     ["jumlahAnggota", "Jumlah Anggota Keluarga", "number", true], ["alamat", "Alamat Lengkap", "textarea", true],
-  ], files: [{ key: "kkFile", label: "Kartu Keluarga (KK)", required: true, accept: ".jpg,.jpeg,.png,.pdf" }] },
+  ], files: [
+    { key: "kkFile", label: "Kartu Keluarga (KK)", required: true, accept: ".jpg,.jpeg,.png,.pdf" },
+    { key: "buktiDesilSebelumnyaFile", label: "Screenshot bukti desil dari kanal resmi DTSEN/Cek Bansos", required: true, accept: ".jpg,.jpeg,.png,.pdf", showWhen: d => d.jenisPengajuan === "Pengajuan Penurunan Desil" }
+  ] },
   { title: "Pekerjaan & Pendapatan", short: "Pekerjaan", icon: WalletCards, color: "green", fields: [
     ["statusKerja", "Status Pekerjaan Kepala Keluarga", "select", true, ["Bekerja tetap", "Bekerja tidak tetap", "Usaha sendiri", "Petani/Nelayan", "Buruh", "Tidak bekerja", "Lainnya"]],
     ["pendapatan", "Perkiraan Pendapatan Rumah Tangga per Bulan", "number", true],
@@ -71,6 +76,7 @@ const STEPS = [
 ];
 
 const emptyData = {
+  jenisPengajuan: "Pemutakhiran Data Sosial Ekonomi", desilSebelumnya: "",
   namaLengkap: "", statusDalamKeluarga: "Kepala Keluarga", nik: "", noKK: "", namaKK: "", jumlahAnggota: "", alamat: "",
   statusKerja: "Bekerja tetap", pendapatan: "", punyaUsaha: "Tidak", npwp: "Tidak",
   statusRumah: "Milik sendiri", kepemilikanTanah: "Milik sendiri", jumlahMotor: "0", jumlahMobil: "0", ternak: "Tidak",
@@ -139,13 +145,13 @@ function AuthScreen({ mode, setMode, onSuccess }) {
 }
 
 function StatusPill({ status }) {
-  const s = status || "Menunggu Verifikasi"; const map = s.includes("Selesai") ? "bg-emerald-50 text-emerald-700" : s.includes("Perlu") ? "bg-amber-50 text-amber-700" : s.includes("Verifikasi") && !s.includes("Menunggu") ? "bg-blue-50 text-blue-700" : "bg-slate-100 text-slate-600";
+  const s = status || "Menunggu Pemeriksaan"; const map = s.includes("Ditolak") ? "bg-rose-50 text-rose-700" : s.includes("Selesai") ? "bg-emerald-50 text-emerald-700" : s.includes("Perlu") ? "bg-amber-50 text-amber-700" : s.includes("Verifikasi") && !s.includes("Menunggu") ? "bg-blue-50 text-blue-700" : "bg-slate-100 text-slate-600";
   return <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold ${map}`}><span className="h-1.5 w-1.5 rounded-full bg-current" />{s}</span>;
 }
 
 function ActivityScreen({ submissions, onBack }) {
   const latest = submissions?.[0];
-  const status = latest?.data?.status_pengajuan || "Menunggu Verifikasi";
+  const status = latest?.status || latest?.data?.status_pengajuan || "Menunggu Pemeriksaan";
   const stages = ["Pengajuan Dikirim", "Menunggu Pemeriksaan", "Sedang Diverifikasi", "Selesai Diverifikasi"];
   const index = status.includes("Selesai") ? 3 : status.includes("Sedang") ? 2 : status.includes("Menunggu") ? 1 : 0;
   return <div className="min-h-screen bg-[#f7faf9]"><Header title="Aktivitas" onBack={onBack} /><main className="mx-auto max-w-3xl px-4 py-7">
@@ -163,6 +169,8 @@ function AdminScreen({ onBack }) {
   const [error, setError] = useState("");
   const [savingId, setSavingId] = useState(null);
   const [notice, setNotice] = useState("");
+  const [preview, setPreview] = useState(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
 
   async function load() {
     setLoading(true); setError("");
@@ -176,21 +184,26 @@ function AdminScreen({ onBack }) {
     setSavingId(id); setNotice(""); setError("");
     try {
       await updateSubmissionStatus(id, status);
-      setItems(v => v.map(x => x.id === id ? { ...x, status_pengajuan: status, data: { ...(x.data || {}), status_pengajuan: status } } : x));
-      setSelected(v => v && v.id === id ? { ...v, status_pengajuan: status, data: { ...(v.data || {}), status_pengajuan: status } } : v);
+      setItems(v => v.map(x => x.id === id ? { ...x, status, status_pengajuan: status, data: { ...(x.data || {}), status_pengajuan: status } } : x));
+      setSelected(v => v && v.id === id ? { ...v, status, status_pengajuan: status, data: { ...(v.data || {}), status_pengajuan: status } } : v);
       setNotice("Status pengajuan berhasil diperbarui.");
     } catch (e) { setError(e?.message || "Status gagal diperbarui."); }
     finally { setSavingId(null); }
   }
 
-  async function openFile(path) {
+  async function openFile(path, name = "Dokumen") {
+    setPreviewLoading(true); setError("");
     try {
       const url = await getAdminSignedUrl(path);
-      if (url) window.open(url, "_blank", "noopener,noreferrer");
+      if (!url) throw new Error("Dokumen tidak ditemukan.");
+      const lower = String(name || path).toLowerCase();
+      const type = /\.(jpg|jpeg|png|webp|gif)$/i.test(lower) ? "image" : "pdf";
+      setPreview({ url, name, type });
     } catch (e) { setError(e?.message || "Dokumen tidak dapat dibuka."); }
+    finally { setPreviewLoading(false); }
   }
 
-  const getStatus = x => x?.status_pengajuan || x?.data?.status_pengajuan || "Menunggu Verifikasi";
+  const getStatus = x => x?.status || x?.status_pengajuan || x?.data?.status_pengajuan || "Menunggu Pemeriksaan";
   const getName = x => x?.data?.namaLengkap || "Warga";
   const getDate = x => x?.created_at ? new Date(x.created_at).toLocaleString("id-ID") : "-";
   const selectedData = selected?.data || {};
@@ -217,9 +230,11 @@ function AdminScreen({ onBack }) {
         <section className="rounded-3xl border border-slate-100 bg-white p-5 shadow-sm">
           {!selected ? <div className="py-16 text-center"><FileCheck2 className="mx-auto text-slate-300" size={42}/><h2 className="mt-4 font-black text-slate-800">Pilih pengajuan</h2><p className="mt-1 text-sm text-slate-500">Detail data warga akan muncul di sini.</p></div> : <>
             <div className="flex items-start justify-between gap-3"><div><p className="text-xs font-bold text-blue-600">Detail Pengajuan</p><h2 className="mt-1 text-xl font-black text-slate-900">{getName(selected)}</h2><p className="mt-1 text-xs text-slate-500">{selected.nomor_pengajuan || selected.id}</p></div><StatusPill status={getStatus(selected)}/></div>
-            <div className="mt-5 grid gap-3 sm:grid-cols-2">{[["NIK",maskNumber(selectedData.nik)],["Nomor KK",maskNumber(selectedData.noKK)],["Status Keluarga",selectedData.statusDalamKeluarga],["Jumlah Anggota",selectedData.jumlahAnggota],["Pendapatan",selectedData.pendapatan ? `Rp ${Number(selectedData.pendapatan).toLocaleString("id-ID")}` : "-"],["Status Rumah",selectedData.statusRumah],["Daya Listrik",selectedData.dayaListrik],["Bansos",selectedData.bansos]].map(([label,value])=><div key={label} className="rounded-2xl bg-slate-50 p-3"><p className="text-xs text-slate-500">{label}</p><p className="mt-1 text-sm font-bold text-slate-800 break-words">{value || "-"}</p></div>)}</div>
-            <div className="mt-5"><h3 className="font-black text-slate-900">Lampiran</h3><div className="mt-3 space-y-2">{fileEntries.length ? fileEntries.map(([key,path])=><button key={key} onClick={()=>openFile(path)} className={`${press} flex w-full items-center justify-between rounded-xl border border-slate-200 bg-white px-4 py-3 text-left hover:bg-blue-50`}><span className="min-w-0"><span className="block truncate text-sm font-semibold text-slate-800">{selectedData[key.replace("_path","_nama_file")] || key.replace("_path","")}</span><span className="text-xs text-slate-500">Buka dokumen</span></span><FileText size={18} className="shrink-0 text-blue-600"/></button>) : <p className="text-sm text-slate-500">Tidak ada lampiran.</p>}</div></div>
-            <div className="mt-6 rounded-2xl border border-amber-100 bg-amber-50 p-4"><p className="text-xs font-bold uppercase tracking-wide text-amber-800">Tindakan Verifikasi</p><div className="mt-3 grid gap-2 sm:grid-cols-3"><button disabled={savingId===selected.id} onClick={()=>setStatus(selected.id,"Sedang Diverifikasi")} className={`${press} rounded-xl border border-blue-200 bg-white px-3 py-2.5 text-sm font-bold text-blue-700 hover:bg-blue-50 disabled:opacity-50`}>Periksa</button><button disabled={savingId===selected.id} onClick={()=>setStatus(selected.id,"Perlu Revisi")} className={`${press} rounded-xl border border-amber-200 bg-white px-3 py-2.5 text-sm font-bold text-amber-700 hover:bg-amber-50 disabled:opacity-50`}>Minta Revisi</button><button disabled={savingId===selected.id} onClick={()=>setStatus(selected.id,"Selesai Diverifikasi")} className={`${press} rounded-xl bg-emerald-600 px-3 py-2.5 text-sm font-bold text-white hover:bg-emerald-700 disabled:opacity-50`}>Verifikasi Selesai</button></div></div>
+            <div className="mt-5 rounded-2xl border border-blue-100 bg-blue-50/50 p-4"><p className="text-xs font-bold uppercase tracking-wide text-blue-700">Ringkasan Pengajuan</p><div className="mt-3 grid gap-3 sm:grid-cols-2">{[["Jenis Pengajuan",selectedData.jenisPengajuan],["Desil Sebelumnya",selectedData.desilSebelumnya],["Indikasi Desil Aplikasi",selectedData.indikasi_desil_aplikasi || selected.indikasi || "-"],["Tanggal Pengajuan",getDate(selected)]].map(([label,value])=><div key={label} className="rounded-xl bg-white p-3"><p className="text-xs text-slate-500">{label}</p><p className="mt-1 text-sm font-bold text-slate-800 break-words">{value || "-"}</p></div>)}</div></div>
+            <div className="mt-5"><h3 className="font-black text-slate-900">Data Warga Lengkap</h3><div className="mt-3 grid gap-3 sm:grid-cols-2">{Object.entries(selectedData).filter(([k,v])=>v!==null&&v!==undefined&&String(v)!==""&&!k.endsWith("_path")&&!k.endsWith("_nama_file")&&k!=="status_pengajuan"&&k!=="indikasi_desil_aplikasi").map(([key,value])=>{const labels={jenisPengajuan:"Jenis Pengajuan",desilSebelumnya:"Desil Sebelumnya",namaLengkap:"Nama Lengkap",statusDalamKeluarga:"Status Dalam Keluarga",namaKK:"Nama Kepala Keluarga",nik:"NIK",noKK:"Nomor KK",jumlahAnggota:"Jumlah Anggota Keluarga",alamat:"Alamat",statusKerja:"Status Pekerjaan",pendapatan:"Pendapatan Rumah Tangga/Bulan",punyaUsaha:"Memiliki Usaha",npwp:"Memiliki NPWP",statusRumah:"Status Tempat Tinggal",kepemilikanTanah:"Kepemilikan Tanah",jumlahMotor:"Jumlah Sepeda Motor",jumlahMobil:"Jumlah Mobil",ternak:"Memiliki Ternak",lantai:"Jenis Lantai",dinding:"Jenis Dinding",atap:"Jenis Atap",airMinum:"Sumber Air Minum",sanitasi:"Sanitasi/Jamban",bahanBakar:"Bahan Bakar Memasak",idPelanggan:"ID Pelanggan/Nomor Meter",jenisMeteran:"Jenis Meteran",dayaListrik:"Daya Listrik",pendidikanKK:"Pendidikan Kepala Keluarga",anakSekolah:"Anak Sedang Sekolah",sakitKronis:"Penyakit Kronis",disabilitas:"Disabilitas",bansos:"Bantuan Sosial"}; const display=key==="pendapatan"?`Rp ${Number(value).toLocaleString("id-ID")}`:String(value); return <div key={key} className="rounded-2xl bg-slate-50 p-3"><p className="text-xs text-slate-500">{labels[key]||key}</p><p className="mt-1 text-sm font-bold text-slate-800 break-words">{display}</p></div>})}</div></div>
+            <div className="mt-5"><h3 className="font-black text-slate-900">Lampiran & Bukti</h3><div className="mt-3 space-y-2">{fileEntries.length ? fileEntries.map(([key,path])=>{const name=selectedData[key.replace("_path","_nama_file")] || key.replace("_path",""); return <button key={key} onClick={()=>openFile(path,name)} className={`${press} flex w-full items-center justify-between rounded-xl border border-slate-200 bg-white px-4 py-3 text-left hover:bg-blue-50`}><span className="min-w-0"><span className="block truncate text-sm font-semibold text-slate-800">{name}</span><span className="text-xs text-slate-500">Klik untuk melihat gambar/PDF</span></span><FileText size={18} className="shrink-0 text-blue-600"/></button>}) : <p className="text-sm text-slate-500">Tidak ada lampiran.</p>}</div></div>
+            <div className="mt-6 rounded-2xl border border-amber-100 bg-amber-50 p-4"><p className="text-xs font-bold uppercase tracking-wide text-amber-800">Tindakan Verifikasi</p><div className="mt-3 grid gap-2 sm:grid-cols-2"><button disabled={savingId===selected.id} onClick={()=>setStatus(selected.id,"Sedang Diverifikasi")} className={`${press} rounded-xl border border-blue-200 bg-white px-3 py-2.5 text-sm font-bold text-blue-700 hover:bg-blue-50 disabled:opacity-50`}>Periksa</button><button disabled={savingId===selected.id} onClick={()=>setStatus(selected.id,"Perlu Revisi")} className={`${press} rounded-xl border border-amber-200 bg-white px-3 py-2.5 text-sm font-bold text-amber-700 hover:bg-amber-50 disabled:opacity-50`}>Minta Revisi</button><button disabled={savingId===selected.id} onClick={()=>setStatus(selected.id,"Selesai Diverifikasi")} className={`${press} rounded-xl bg-emerald-600 px-3 py-2.5 text-sm font-bold text-white hover:bg-emerald-700 disabled:opacity-50`}>Verifikasi Selesai</button><button disabled={savingId===selected.id} onClick={()=>setStatus(selected.id,"Pengajuan Ditolak")} className={`${press} rounded-xl bg-rose-600 px-3 py-2.5 text-sm font-bold text-white hover:bg-rose-700 disabled:opacity-50`}>Tolak Pengajuan</button></div></div>
+            {preview && <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4" onClick={()=>setPreview(null)}><div className="flex max-h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl" onClick={e=>e.stopPropagation()}><div className="flex items-center justify-between border-b border-slate-100 px-4 py-3"><div className="min-w-0"><p className="font-black text-slate-900 truncate">{preview.name}</p><p className="text-xs text-slate-500">Pratinjau dokumen</p></div><button onClick={()=>setPreview(null)} className="rounded-xl p-2 text-slate-500 hover:bg-slate-100"><X size={20}/></button></div><div className="min-h-[55vh] overflow-auto bg-slate-100 p-3">{previewLoading ? <div className="flex h-[55vh] items-center justify-center text-sm text-slate-500">Membuka dokumen...</div> : preview.type==="image" ? <img src={preview.url} alt={preview.name} className="mx-auto max-h-[75vh] max-w-full rounded-xl object-contain"/> : <iframe title={preview.name} src={preview.url} className="h-[75vh] w-full rounded-xl bg-white"/>}</div></div></div>}
           </>}
         </section>
       </div>
@@ -244,8 +259,18 @@ export default function App() {
   useEffect(() => { (async()=>{ try { const p = await getCurrentProfile(); setUser(p); if (p) setSubmissions(await getMySubmissions().catch(()=>[])); } finally { setLoading(false); } })(); }, []);
   const current = STEPS[step]; const progress = ((step + 1) / STEPS.length) * 100;
   const updateField = (key, value) => setFormData(d => ({...d, [key]: value})); const updateFile = (key, file) => setFiles(f => ({...f, [key]: file}));
-  const configs = useMemo(()=> (current.files || []).filter(c => !c.conditional || Number(formData.jumlahMotor)>0 || Number(formData.jumlahMobil)>0), [current, formData.jumlahMotor, formData.jumlahMobil]);
-  function validateStep() { const e={}; current.fields.forEach(([k,l,,required])=>{if(required&&!String(formData[k]??"").trim())e[k]=`${l} wajib diisi.`}); configs.forEach(c=>{if(c.required&&!files[c.key])e[c.key]="Lampiran ini wajib diunggah."}); setErrors(e); return !Object.keys(e).length; }
+  const configs = useMemo(()=> (current.files || []).filter(c => {
+    if (c.showWhen && !c.showWhen(formData)) return false;
+    if (c.conditional && !(Number(formData.jumlahMotor)>0 || Number(formData.jumlahMobil)>0)) return false;
+    return true;
+  }), [current, formData]);
+  function validateStep() {
+    const e={};
+    current.fields.forEach(([k,l,,required])=>{if(required&&!String(formData[k]??"").trim())e[k]=`${l} wajib diisi.`});
+    if (formData.jenisPengajuan === "Pengajuan Penurunan Desil" && !String(formData.desilSebelumnya||"").trim()) e.desilSebelumnya = "Desil sebelumnya wajib dipilih untuk pengajuan penurunan desil.";
+    configs.forEach(c=>{if(c.required&&!files[c.key])e[c.key]="Lampiran ini wajib diunggah."});
+    setErrors(e); return !Object.keys(e).length;
+  }
   async function submit() { if(!validateStep()) return; setSaving(true); setNotice(""); try { const desil=calculateIndicativeDesil(formData); const result=await saveDataUpdateSubmission(user?.id,{formData,files,indikasi:desil}); setIndicative(desil); setReceipt(result); setSubmissions([{...result,data:{status_pengajuan:"Menunggu Verifikasi"},created_at:new Date().toISOString()},...submissions]); setScreen("result"); window.scrollTo({top:0,behavior:"smooth"}); } catch(e) { setNotice(e?.message||"Pengajuan gagal dikirim."); } finally { setSaving(false); } }
   async function logout(){ await signOutUser(); setUser(null); setScreen("home"); }
   if(loading)return <div className="min-h-screen flex items-center justify-center bg-[#f7faf9] text-slate-500">Memuat akun...</div>; if(!user)return <AuthScreen mode={authMode} setMode={setAuthMode} onSuccess={p=>{setUser(p);setScreen("home");}}/>;
