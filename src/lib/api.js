@@ -258,5 +258,20 @@ export async function saveDesilSubmission(
 
 /* =========================
    ADMIN
-   =========================
-```
+   ========================= */
+
+// Mengambil seluruh pengajuan untuk halaman admin.
+export async function getAdminSubmissions() {
+  const { data, error } = await supabase
+    .from("desil_submissions")
+    .select(
+      "id, user_id, data, score, indikasi, created_at"
+    )
+    .order("created_at", {
+      ascending: false,
+    });
+
+  if (error) throw error;
+
+  return data || [];
+}
