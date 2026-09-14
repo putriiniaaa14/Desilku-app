@@ -10,16 +10,27 @@ import { supabase } from "./supabaseClient";
 // Jadi kita cari dulu email dari tabel profiles berdasarkan username,
 // baru sign-in ke Supabase Auth pakai email tsb.
 export async function getEmailByUsername(username) {
+  const cleanUsername = username.trim().toLowerCase();
+
   const { data, error } = await supabase
     .from("profiles")
     .select("email")
-    .ilike("username", username.trim())
+    .ilike("username", cleanUsername)
     .maybeSingle();
-  if (error || !data) return null;
+
+  if (error) {
+    console.error("Gagal mencari username:", error);
+    throw error;
+  }
+
+  if (!data) {
+    const err = new Error("Username tidak ditemukan.");
+    err.code = "username-not-found";
+    throw err;
+  }
+
   return data.email;
 }
-
-export async function getUsernameByEmail(email) {
   const { data, error } = await supabase
     .from("profiles")
     .select("username")
