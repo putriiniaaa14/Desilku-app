@@ -56,7 +56,7 @@ export async function saveDataUpdateSubmission(userId, { formData, files, indika
     payload[`${key}_path`] = path;
     payload[`${key}_nama_file`] = file.name;
   }
-  const { data, error } = await supabase.from("desil_submissions").insert({ user_id: userId, data: payload, score: null, indikasi: indikasi ?? null }).select("id, created_at").single();
+  const { data, error } = await supabase.from("desil_submissions").insert({ user_id: userId, data: payload, score: null, indikasi: indikasi ?? null, status: "Menunggu Pemeriksaan" }).select("id, created_at").single();
   if (error) throw error;
   const date = new Date(data.created_at || Date.now());
   const nomorPengajuan = `DSK-${date.getFullYear()}${String(date.getMonth()+1).padStart(2,"0")}${String(date.getDate()).padStart(2,"0")}-${String(data.id).slice(0,4).toUpperCase()}`;
@@ -64,11 +64,11 @@ export async function saveDataUpdateSubmission(userId, { formData, files, indika
 }
 
 export async function getMySubmissions() {
-  const { data, error } = await supabase.from("desil_submissions").select("id, created_at, data, indikasi").order("created_at", { ascending: false });
+  const { data, error } = await supabase.from("desil_submissions").select("id, created_at, data, indikasi, status").order("created_at", { ascending: false });
   if (error) throw error;
   return (data || []).map(row => {
     const created = new Date(row.created_at || Date.now());
-    return { ...row, nomorPengajuan: `DSK-${created.getFullYear()}${String(created.getMonth()+1).padStart(2,"0")}${String(created.getDate()).padStart(2,"0")}-${String(row.id).slice(0,4).toUpperCase()}` };
+    return { ...row, status: row.status || row.data?.status_pengajuan || "Menunggu Pemeriksaan", nomorPengajuan: `DSK-${created.getFullYear()}${String(created.getMonth()+1).padStart(2,"0")}${String(created.getDate()).padStart(2,"0")}-${String(row.id).slice(0,4).toUpperCase()}` };
   });
 }
 
