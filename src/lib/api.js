@@ -1,18 +1,25 @@
+```javascript
 import { supabase } from "./supabaseClient";
 
 /* ----------------------------------------------------------------------
  * Lapisan Supabase untuk login, daftar, reset sandi, dan penyimpanan data.
  * ------------------------------------------------------------------- */
 
-// Cari email berdasarkan username untuk proses login.
+/* =========================
+   LOGIN & PROFIL
+   ========================= */
+
+// Cari email berdasarkan username menggunakan RPC Supabase.
+// Tidak membaca tabel profiles secara langsung sehingga tidak terkena RLS.
 export async function getEmailByUsername(username) {
   const cleanUsername = username.trim().toLowerCase();
 
-  const { data, error } = await supabase
-    .from("profiles")
-    .select("email")
-    .ilike("username", cleanUsername)
-    .maybeSingle();
+  const { data, error } = await supabase.rpc(
+    "get_email_by_username",
+    {
+      p_username: cleanUsername,
+    }
+  );
 
   if (error) {
     console.error("Gagal mencari username:", error);
@@ -25,9 +32,10 @@ export async function getEmailByUsername(username) {
     throw err;
   }
 
-  return data.email;
+  return data;
 }
 
+// Cari username berdasarkan email.
 export async function getUsernameByEmail(email) {
   const { data, error } = await supabase
     .from("profiles")
@@ -36,81 +44,129 @@ export async function getUsernameByEmail(email) {
     .maybeSingle();
 
   if (error || !data) return null;
+
   return data.username;
 }
 
+// Mengecek apakah username sudah digunakan.
 export async function isUsernameTaken(username) {
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("profiles")
     .select("id")
     .ilike("username", username.trim())
     .maybeSingle();
 
+  if (error) return false;
+
   return !!data;
 }
 
-export async function signUpUser({ email, username, password }) {
+// Daftar akun baru.
+export async function signUpUser({
+  email,
+  username,
+  password,
+}) {
+  const cleanEmail = email.trim();
+  const cleanUsername = username.trim();
+
   const { data, error } = await supabase.auth.signUp({
-    email: email.trim(),
+    email: cleanEmail,
     password,
     options: {
       data: {
-        username: username.trim(),
+        username: cleanUsername,
       },
     },
   });
 
   if (error) throw error;
+
   return data;
 }
 
-export async function signInWithUsername({ username, password }) {
+// Login menggunakan username + password.
+export async function signInWithUsername({
+  username,
+  password,
+}) {
   const cleanUsername = username.trim().toLowerCase();
 
   const email = await getEmailByUsername(cleanUsername);
 
-  const { data, error } = await supabase.auth.signInWithPassword({
-    email,
-    password,
-  });
+  const { data, error } =
+    await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
 
   if (error) throw error;
+
   return data;
 }
 
+// Logout.
 export async function signOutUser() {
-  await supabase.auth.signOut();
+  const { error } = await supabase.auth.signOut();
+
+  if (error) throw error;
 }
 
+// Mengambil profil user yang sedang login.
 export async function getCurrentProfile() {
-  const { data: sessionData } = await supabase.auth.getSession();
+  const { data: sessionData, error: sessionError } =
+    await supabase.auth.getSession();
+
+  if (sessionError) {
+    console.error(
+      "Gagal mengambil session:",
+      sessionError
+    );
+    return null;
+  }
+
   const session = sessionData?.session;
 
   if (!session) return null;
 
   const { data, error } = await supabase
     .from("profiles")
-    .select("id, username, email, role")
+    .select("id, username, email, is_admin")
     .eq("id", session.user.id)
     .maybeSingle();
 
-  if (error || !data) return null;
+  if (error || !data) {
+    console.error(
+      "Gagal mengambil profil:",
+      error
+    );
+    return null;
+  }
 
   return data;
 }
 
+/* =========================
+   RESET & GANTI PASSWORD
+   ========================= */
+
+// Meminta email reset password.
 export async function requestPasswordReset(email) {
-  const { error } = await supabase.auth.resetPasswordForEmail(
-    email.trim(),
-    {
-      redirectTo: `${window.location.origin}/reset-password`,
-    }
-  );
+  const { error } =
+    await supabase.auth.resetPasswordForEmail(
+      email.trim(),
+      {
+        redirectTo: `${window.location.origin}/reset-password`,
+      }
+    );
 
   if (error) throw error;
 }
 
-export async function updatePasswordAfterRecovery(newPassword) {
+// Mengubah password setelah proses recovery.
+export async function updatePasswordAfterRecovery(
+  newPassword
+) {
   const { error } = await supabase.auth.updateUser({
     password: newPassword,
   });
@@ -118,6 +174,7 @@ export async function updatePasswordAfterRecovery(newPassword) {
   if (error) throw error;
 }
 
+// Mengganti password dari dalam akun.
 export async function changePassword({
   email,
   currentPassword,
@@ -125,13 +182,17 @@ export async function changePassword({
 }) {
   const { error: verifyError } =
     await supabase.auth.signInWithPassword({
-      email,
+      email: email.trim(),
       password: currentPassword,
     });
 
   if (verifyError) {
-    const err = new Error("Sandi saat ini tidak sesuai.");
+    const err = new Error(
+      "Sandi saat ini tidak sesuai."
+    );
+
     err.code = "wrong-current-password";
+
     throw err;
   }
 
@@ -142,25 +203,40 @@ export async function changePassword({
   if (error) throw error;
 }
 
+/* =========================
+   DATA DESIL
+   ========================= */
+
+// Menyimpan pengajuan/data desil warga.
 export async function saveDesilSubmission(
   userId,
-  { formData, score, indikasi, skckFile }
+  {
+    formData,
+    score,
+    indikasi,
+    skckFile,
+  }
 ) {
-  const payload = { ...formData };
+  const payload = {
+    ...formData,
+  };
 
+  // Upload dokumen SKCK jika ada.
   if (skckFile) {
     const safeName = skckFile.name.replace(
       /[^a-zA-Z0-9._-]/g,
       "_"
     );
 
-    const path = `${userId}/skck-${Date.now()}-${safeName}`;
+    const path =
+      `${userId}/skck-${Date.now()}-${safeName}`;
 
-    const { error: uploadError } = await supabase.storage
-      .from("dokumen-warga")
-      .upload(path, skckFile, {
-        upsert: false,
-      });
+    const { error: uploadError } =
+      await supabase.storage
+        .from("dokumen-warga")
+        .upload(path, skckFile, {
+          upsert: false,
+        });
 
     if (uploadError) throw uploadError;
 
@@ -180,17 +256,7 @@ export async function saveDesilSubmission(
   if (error) throw error;
 }
 
-export async function getAdminSubmissions() {
-  const { data, error } = await supabase
-    .from("desil_submissions")
-    .select(
-      "id, user_id, data, score, indikasi, created_at"
-    )
-    .order("created_at", {
-      ascending: false,
-    });
-
-  if (error) throw error;
-
-  return data || [];
-}
+/* =========================
+   ADMIN
+   =========================
+```
