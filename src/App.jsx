@@ -19,51 +19,64 @@ const COLORS = {
 
 const STEPS = [
   { title: "Data Diri & Kependudukan", short: "Data Diri", icon: UserRound, color: "blue", fields: [
-    ["nik", "NIK", "text", true], ["noKK", "Nomor KK", "text", true], ["namaKK", "Nama Kepala Keluarga", "text", true],
+    ["namaLengkap", "Nama Lengkap", "text", true],
+    ["statusDalamKeluarga", "Sebagai Apa?", "select", true, ["Kepala Keluarga", "Suami/Istri", "Anak", "Anggota Keluarga Lainnya"]],
+    ["namaKK", "Nama Kepala Keluarga", "text", true],
+    ["nik", "NIK", "text", true], ["noKK", "Nomor KK", "text", true],
     ["jumlahAnggota", "Jumlah Anggota Keluarga", "number", true], ["alamat", "Alamat Lengkap", "textarea", true],
   ], files: [{ key: "kkFile", label: "Kartu Keluarga (KK)", required: true, accept: ".jpg,.jpeg,.png,.pdf" }] },
   { title: "Pekerjaan & Pendapatan", short: "Pekerjaan", icon: WalletCards, color: "green", fields: [
-    ["statusKerja", "Status Pekerjaan Kepala Keluarga", "text", true], ["pendapatan", "Perkiraan Pendapatan Rumah Tangga per Bulan", "number", true],
+    ["statusKerja", "Status Pekerjaan Kepala Keluarga", "select", true, ["Bekerja tetap", "Bekerja tidak tetap", "Usaha sendiri", "Petani/Nelayan", "Buruh", "Tidak bekerja", "Lainnya"]],
+    ["pendapatan", "Perkiraan Pendapatan Rumah Tangga per Bulan", "number", true],
     ["punyaUsaha", "Memiliki Usaha", "select", true, ["Tidak", "Ya"]], ["npwp", "Memiliki NPWP", "select", true, ["Tidak", "Ya"]],
   ], files: [{ key: "salaryFile", label: "Bukti penghasilan/gaji (jika ada)", required: false, accept: ".jpg,.jpeg,.png,.pdf" }] },
   { title: "Aset & Kendaraan", short: "Aset", icon: Car, color: "yellow", fields: [
-    ["statusRumah", "Status Tempat Tinggal", "select", true, ["Milik sendiri", "Kontrak/sewa", "Menumpang", "Lainnya"]],
-    ["kepemilikanTanah", "Kepemilikan Tanah", "select", true, ["Milik sendiri", "Tidak memiliki", "Lainnya"]],
+    ["statusRumah", "Status Tempat Tinggal", "select", true, ["Milik sendiri", "Kontrak/sewa", "Menumpang keluarga", "Rumah dinas", "Lainnya"]],
+    ["kepemilikanTanah", "Kepemilikan Tanah", "select", true, ["Milik sendiri", "Tidak memiliki", "Milik keluarga", "Lainnya"]],
     ["jumlahMotor", "Jumlah Sepeda Motor", "number", true], ["jumlahMobil", "Jumlah Mobil", "number", true],
     ["ternak", "Memiliki Ternak", "select", true, ["Tidak", "Ya"]],
-  ], files: [{ key: "stnkBpkbFile", label: "STNK/BPKB kendaraan", required: false, accept: ".jpg,.jpeg,.png,.pdf", conditional: true }] },
+  ], files: [{ key: "stnkBpkbFile", label: "STNK/BPKB kendaraan (jika ada kendaraan)", required: false, accept: ".jpg,.jpeg,.png,.pdf", conditional: true }] },
   { title: "Kondisi Tempat Tinggal", short: "Rumah", icon: Home, color: "green", fields: [
-    ["lantai", "Jenis Lantai", "text", true], ["dinding", "Jenis Dinding", "text", true], ["atap", "Jenis Atap", "text", true],
-    ["airMinum", "Sumber Air Minum", "text", true], ["sanitasi", "Kondisi Sanitasi/Jamban", "text", true], ["bahanBakar", "Bahan Bakar Memasak", "text", true],
+    ["lantai", "Jenis Lantai", "select", true, ["Keramik/granit", "Semen", "Kayu", "Bambu", "Tanah", "Lainnya"]],
+    ["dinding", "Jenis Dinding", "select", true, ["Tembok", "Kayu", "Bambu", "Seng", "Campuran", "Lainnya"]],
+    ["atap", "Jenis Atap", "select", true, ["Genteng", "Seng", "Asbes", "Beton", "Jerami/daun", "Lainnya"]],
+    ["airMinum", "Sumber Air Minum", "select", true, ["Air kemasan/isi ulang", "PDAM", "Sumur", "Mata air", "Sungai", "Lainnya"]],
+    ["sanitasi", "Kondisi Sanitasi/Jamban", "select", true, ["Jamban sendiri layak", "Jamban bersama", "Jamban tidak layak", "Tidak memiliki jamban"]],
+    ["bahanBakar", "Bahan Bakar Memasak", "select", true, ["LPG", "Listrik", "Kayu bakar", "Minyak tanah", "Lainnya"]],
   ], files: [
     { key: "houseFrontFile", label: "Foto tampak depan rumah", required: true, accept: ".jpg,.jpeg,.png" },
     { key: "livingRoomFile", label: "Foto ruang keluarga/ruang tamu", required: true, accept: ".jpg,.jpeg,.png" },
     { key: "kitchenFile", label: "Foto dapur", required: true, accept: ".jpg,.jpeg,.png" },
   ] },
   { title: "Data Listrik", short: "Listrik", icon: Zap, color: "yellow", fields: [
-    ["idPelanggan", "ID Pelanggan / Nomor Meter", "text", true], ["jenisMeteran", "Jenis Meteran", "select", true, ["Token/prabayar", "Pascabayar"]], ["dayaListrik", "Daya Listrik", "text", true],
+    ["idPelanggan", "ID Pelanggan / Nomor Meter", "text", true],
+    ["jenisMeteran", "Jenis Meteran", "select", true, ["Token/prabayar", "Pascabayar"]],
+    ["dayaListrik", "Daya Listrik", "select", true, ["450 VA", "900 VA", "1.300 VA", "2.200 VA", "3.500 VA", "4.400–5.500 VA", "Lebih dari 5.500 VA", "Tidak tahu"]],
   ], files: [{ key: "electricityFile", label: "Bukti listrik/token", required: true, accept: ".jpg,.jpeg,.png,.pdf" }] },
   { title: "Pendidikan", short: "Pendidikan", icon: GraduationCap, color: "blue", fields: [
-    ["pendidikanKK", "Pendidikan Terakhir Kepala Keluarga", "text", true], ["anakSekolah", "Jumlah Anak yang Sedang Sekolah", "number", true],
+    ["pendidikanKK", "Pendidikan Terakhir Kepala Keluarga", "select", true, ["Belum sekolah", "Tidak tamat SD", "SD/sederajat", "SMP/sederajat", "SMA/SMK/sederajat", "D1", "D2", "D3", "D4/S1", "S2", "S3/Doktor"]],
+    ["anakSekolah", "Jumlah Anak yang Sedang Sekolah", "number", true],
   ] },
   { title: "Kesehatan & Disabilitas", short: "Kesehatan", icon: HeartPulse, color: "green", fields: [
     ["sakitKronis", "Ada Anggota Keluarga dengan Penyakit Kronis", "select", true, ["Tidak", "Ya"]],
     ["disabilitas", "Ada Anggota Keluarga dengan Disabilitas", "select", true, ["Tidak", "Ya"]],
   ] },
   { title: "Riwayat Bantuan Sosial", short: "Bansos", icon: Gift, color: "yellow", fields: [
-    ["bansos", "Bantuan Sosial yang Diterima", "text", true], ["pkh", "Menerima PKH", "select", true, ["Tidak", "Ya"]], ["pkhTahunMulai", "Tahun Mulai Menerima PKH", "number", false],
-  ], files: [{ key: "bansosEvidenceFile", label: "Bukti bantuan sosial (jika ada)", required: false, accept: ".jpg,.jpeg,.png,.pdf" }] },
-  { title: "Pengeluaran Rumah Tangga", short: "Pengeluaran", icon: ShoppingCart, color: "blue", fields: [
-    ["pengeluaranPangan", "Perkiraan Pengeluaran Pangan per Bulan", "number", true], ["pengeluaranNonPangan", "Perkiraan Pengeluaran Non-Pangan per Bulan", "number", true],
+    ["bansos", "Bantuan Sosial yang Diterima", "select", true, ["Tidak menerima bantuan", "PKH", "Sembako/BPNT", "PBI-JK", "BLT", "KIP/PIP", "PKH dan Sembako/BPNT", "Bantuan lainnya"]],
+  ], files: [
+    { key: "bansosEvidenceFile", label: "Bukti bantuan sosial (jika ada)", required: false, accept: ".jpg,.jpeg,.png,.pdf" },
+    { key: "sktmFile", label: "Surat Keterangan Tidak Mampu (SKTM)", required: true, accept: ".jpg,.jpeg,.png,.pdf" },
   ] },
 ];
 
 const emptyData = {
-  nik: "", noKK: "", namaKK: "", jumlahAnggota: "", alamat: "", statusKerja: "", pendapatan: "", punyaUsaha: "Tidak", npwp: "Tidak",
+  namaLengkap: "", statusDalamKeluarga: "Kepala Keluarga", nik: "", noKK: "", namaKK: "", jumlahAnggota: "", alamat: "",
+  statusKerja: "Bekerja tetap", pendapatan: "", punyaUsaha: "Tidak", npwp: "Tidak",
   statusRumah: "Milik sendiri", kepemilikanTanah: "Milik sendiri", jumlahMotor: "0", jumlahMobil: "0", ternak: "Tidak",
-  lantai: "", dinding: "", atap: "", airMinum: "", sanitasi: "", bahanBakar: "", idPelanggan: "", jenisMeteran: "Token/prabayar", dayaListrik: "",
-  pendidikanKK: "", anakSekolah: "0", sakitKronis: "Tidak", disabilitas: "Tidak", bansos: "", pkh: "Tidak", pkhTahunMulai: "",
-  pengeluaranPangan: "", pengeluaranNonPangan: "",
+  lantai: "Keramik/granit", dinding: "Tembok", atap: "Genteng", airMinum: "Air kemasan/isi ulang", sanitasi: "Jamban sendiri layak", bahanBakar: "LPG",
+  idPelanggan: "", jenisMeteran: "Token/prabayar", dayaListrik: "900 VA",
+  pendidikanKK: "SMA/SMK/sederajat", anakSekolah: "0", sakitKronis: "Tidak", disabilitas: "Tidak",
+  bansos: "Tidak menerima bantuan",
 };
 
 const press = "transition-all duration-150 active:scale-[0.97] hover:-translate-y-0.5";
@@ -78,16 +91,13 @@ function maskNumber(value) {
 function calculateIndicativeDesil(d) {
   let points = 0;
   const income = Number(d.pendapatan || 0);
-  const food = Number(d.pengeluaranPangan || 0);
-  const nonFood = Number(d.pengeluaranNonPangan || 0);
   if (income > 0 && income <= 3000000) points += 3; else if (income <= 5000000) points += 2; else if (income > 8000000) points -= 2;
   if (["Kontrak/sewa", "Menumpang"].includes(d.statusRumah)) points += 2;
   if (Number(d.jumlahMotor) > 1) points += 1;
   if (Number(d.jumlahMobil) > 0) points -= 2;
   if (d.punyaUsaha === "Tidak") points += 1;
   if (d.sakitKronis === "Ya" || d.disabilitas === "Ya") points += 1;
-  if (d.pkh === "Ya") points += 2;
-  if (food + nonFood > income && income > 0) points += 1;
+  if (/PKH|Sembako|BPNT|PBI-JK|BLT|KIP|PIP/i.test(d.bansos || "")) points += 2;
   if (d.lantai && /tanah|bambu/i.test(d.lantai)) points += 1;
   if (d.sanitasi && /tidak|buruk/i.test(d.sanitasi)) points += 1;
   return Math.min(10, Math.max(1, 5 + points));
@@ -161,7 +171,7 @@ export default function App() {
   const current = STEPS[step]; const progress = ((step + 1) / STEPS.length) * 100;
   const updateField = (key, value) => setFormData(d => ({...d, [key]: value})); const updateFile = (key, file) => setFiles(f => ({...f, [key]: file}));
   const configs = useMemo(()=> (current.files || []).filter(c => !c.conditional || Number(formData.jumlahMotor)>0 || Number(formData.jumlahMobil)>0), [current, formData.jumlahMotor, formData.jumlahMobil]);
-  function validateStep() { const e={}; current.fields.forEach(([k,l,,required])=>{if(required&&!String(formData[k]??"").trim())e[k]=`${l} wajib diisi.`}); if(formData.pkh==="Ya"&&!String(formData.pkhTahunMulai).trim())e.pkhTahunMulai="Tahun mulai PKH wajib diisi."; configs.forEach(c=>{if(c.required&&!files[c.key])e[c.key]="Lampiran ini wajib diunggah."}); setErrors(e); return !Object.keys(e).length; }
+  function validateStep() { const e={}; current.fields.forEach(([k,l,,required])=>{if(required&&!String(formData[k]??"").trim())e[k]=`${l} wajib diisi.`}); configs.forEach(c=>{if(c.required&&!files[c.key])e[c.key]="Lampiran ini wajib diunggah."}); setErrors(e); return !Object.keys(e).length; }
   async function submit() { if(!validateStep()) return; setSaving(true); setNotice(""); try { const desil=calculateIndicativeDesil(formData); const result=await saveDataUpdateSubmission(user?.id,{formData,files,indikasi:desil}); setIndicative(desil); setReceipt(result); setSubmissions([{...result,data:{status_pengajuan:"Menunggu Verifikasi"},created_at:new Date().toISOString()},...submissions]); setScreen("result"); window.scrollTo({top:0,behavior:"smooth"}); } catch(e) { setNotice(e?.message||"Pengajuan gagal dikirim."); } finally { setSaving(false); } }
   async function logout(){ await signOutUser(); setUser(null); setScreen("home"); }
   if(loading)return <div className="min-h-screen flex items-center justify-center bg-[#f7faf9] text-slate-500">Memuat akun...</div>; if(!user)return <AuthScreen mode={authMode} setMode={setAuthMode} onSuccess={p=>{setUser(p);setScreen("home");}}/>;
