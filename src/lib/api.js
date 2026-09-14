@@ -90,7 +90,7 @@ export async function updateSubmissionStatus(submissionId, status) {
 
 export async function getAdminSignedUrl(path) {
   if (!path) return null;
-  const { data, error } = await supabase.storage.from("dokumen-warga").createSignedUrl(path, 300);
+  const { data, error } = await supabase.rpc("get_admin_document_url", { p_path: path });
   if (error) throw error;
-  return data?.signedUrl || null;
+  return data || null;
 }
