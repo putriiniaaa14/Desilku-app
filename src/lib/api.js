@@ -1,16 +1,10 @@
-```javascript
 import { supabase } from "./supabaseClient";
-
-/* ----------------------------------------------------------------------
- * Lapisan Supabase untuk login, daftar, reset sandi, dan penyimpanan data.
- * ------------------------------------------------------------------- */
 
 /* =========================
    LOGIN & PROFIL
    ========================= */
 
 // Cari email berdasarkan username menggunakan RPC Supabase.
-// Tidak membaca tabel profiles secara langsung sehingga tidak terkena RLS.
 export async function getEmailByUsername(username) {
   const cleanUsername = username.trim().toLowerCase();
 
@@ -43,7 +37,9 @@ export async function getUsernameByEmail(email) {
     .ilike("email", email.trim())
     .maybeSingle();
 
-  if (error || !data) return null;
+  if (error || !data) {
+    return null;
+  }
 
   return data.username;
 }
@@ -56,7 +52,9 @@ export async function isUsernameTaken(username) {
     .ilike("username", username.trim())
     .maybeSingle();
 
-  if (error) return false;
+  if (error) {
+    return false;
+  }
 
   return !!data;
 }
@@ -80,7 +78,9 @@ export async function signUpUser({
     },
   });
 
-  if (error) throw error;
+  if (error) {
+    throw error;
+  }
 
   return data;
 }
@@ -96,11 +96,13 @@ export async function signInWithUsername({
 
   const { data, error } =
     await supabase.auth.signInWithPassword({
-      email,
-      password,
+      email: email,
+      password: password,
     });
 
-  if (error) throw error;
+  if (error) {
+    throw error;
+  }
 
   return data;
 }
@@ -109,7 +111,9 @@ export async function signInWithUsername({
 export async function signOutUser() {
   const { error } = await supabase.auth.signOut();
 
-  if (error) throw error;
+  if (error) {
+    throw error;
+  }
 }
 
 // Mengambil profil user yang sedang login.
@@ -127,7 +131,9 @@ export async function getCurrentProfile() {
 
   const session = sessionData?.session;
 
-  if (!session) return null;
+  if (!session) {
+    return null;
+  }
 
   const { data, error } = await supabase
     .from("profiles")
@@ -156,11 +162,14 @@ export async function requestPasswordReset(email) {
     await supabase.auth.resetPasswordForEmail(
       email.trim(),
       {
-        redirectTo: `${window.location.origin}/reset-password`,
+        redirectTo:
+          `${window.location.origin}/reset-password`,
       }
     );
 
-  if (error) throw error;
+  if (error) {
+    throw error;
+  }
 }
 
 // Mengubah password setelah proses recovery.
@@ -171,7 +180,9 @@ export async function updatePasswordAfterRecovery(
     password: newPassword,
   });
 
-  if (error) throw error;
+  if (error) {
+    throw error;
+  }
 }
 
 // Mengganti password dari dalam akun.
@@ -200,7 +211,9 @@ export async function changePassword({
     password: newPassword,
   });
 
-  if (error) throw error;
+  if (error) {
+    throw error;
+  }
 }
 
 /* =========================
@@ -238,7 +251,9 @@ export async function saveDesilSubmission(
           upsert: false,
         });
 
-    if (uploadError) throw uploadError;
+    if (uploadError) {
+      throw uploadError;
+    }
 
     payload.skck_path = path;
     payload.skck_nama_file = skckFile.name;
@@ -249,11 +264,13 @@ export async function saveDesilSubmission(
     .insert({
       user_id: userId,
       data: payload,
-      score,
-      indikasi,
+      score: score,
+      indikasi: indikasi,
     });
 
-  if (error) throw error;
+  if (error) {
+    throw error;
+  }
 }
 
 /* =========================
@@ -271,7 +288,9 @@ export async function getAdminSubmissions() {
       ascending: false,
     });
 
-  if (error) throw error;
+  if (error) {
+    throw error;
+  }
 
   return data || [];
 }
