@@ -135,13 +135,11 @@ export async function getCurrentProfile() {
     return null;
   }
 
-  const { data, error } = await supabase
-    .from("profiles")
-    .select("id, username, email, is_admin")
-    .eq("id", session.user.id)
-    .maybeSingle();
+  const { data, error } = await supabase.rpc(
+    "get_my_profile"
+  );
 
-  if (error || !data) {
+  if (error) {
     console.error(
       "Gagal mengambil profil:",
       error
@@ -149,7 +147,11 @@ export async function getCurrentProfile() {
     return null;
   }
 
-  return data;
+  if (!data || data.length === 0) {
+    return null;
+  }
+
+  return data[0];
 }
 
 /* =========================
@@ -165,132 +167,4 @@ export async function requestPasswordReset(email) {
         redirectTo:
           `${window.location.origin}/reset-password`,
       }
-    );
-
-  if (error) {
-    throw error;
-  }
-}
-
-// Mengubah password setelah proses recovery.
-export async function updatePasswordAfterRecovery(
-  newPassword
-) {
-  const { error } = await supabase.auth.updateUser({
-    password: newPassword,
-  });
-
-  if (error) {
-    throw error;
-  }
-}
-
-// Mengganti password dari dalam akun.
-export async function changePassword({
-  email,
-  currentPassword,
-  newPassword,
-}) {
-  const { error: verifyError } =
-    await supabase.auth.signInWithPassword({
-      email: email.trim(),
-      password: currentPassword,
-    });
-
-  if (verifyError) {
-    const err = new Error(
-      "Sandi saat ini tidak sesuai."
-    );
-
-    err.code = "wrong-current-password";
-
-    throw err;
-  }
-
-  const { error } = await supabase.auth.updateUser({
-    password: newPassword,
-  });
-
-  if (error) {
-    throw error;
-  }
-}
-
-/* =========================
-   DATA DESIL
-   ========================= */
-
-// Menyimpan pengajuan/data desil warga.
-export async function saveDesilSubmission(
-  userId,
-  {
-    formData,
-    score,
-    indikasi,
-    skckFile,
-  }
-) {
-  const payload = {
-    ...formData,
-  };
-
-  // Upload dokumen SKCK jika ada.
-  if (skckFile) {
-    const safeName = skckFile.name.replace(
-      /[^a-zA-Z0-9._-]/g,
-      "_"
-    );
-
-    const path =
-      `${userId}/skck-${Date.now()}-${safeName}`;
-
-    const { error: uploadError } =
-      await supabase.storage
-        .from("dokumen-warga")
-        .upload(path, skckFile, {
-          upsert: false,
-        });
-
-    if (uploadError) {
-      throw uploadError;
-    }
-
-    payload.skck_path = path;
-    payload.skck_nama_file = skckFile.name;
-  }
-
-  const { error } = await supabase
-    .from("desil_submissions")
-    .insert({
-      user_id: userId,
-      data: payload,
-      score: score,
-      indikasi: indikasi,
-    });
-
-  if (error) {
-    throw error;
-  }
-}
-
-/* =========================
-   ADMIN
-   ========================= */
-
-// Mengambil seluruh pengajuan untuk halaman admin.
-export async function getAdminSubmissions() {
-  const { data, error } = await supabase
-    .from("desil_submissions")
-    .select(
-      "id, user_id, data, score, indikasi, created_at"
-    )
-    .order("created_at", {
-      ascending: false,
-    });
-
-  if (error) {
-    throw error;
-  }
-
-  return data || [];
-}
+   
