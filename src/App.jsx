@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import {
   ArrowLeft, ArrowRight, CheckCircle2, ClipboardList, FileCheck2,
   FileText, Home, LogOut, ShieldCheck, Upload, UserRound, WalletCards,
-  Car, House, Zap, GraduationCap, HeartPulse, Gift, ShoppingCart,
+  Car, Zap, GraduationCap, HeartPulse, Gift, ShoppingCart,
 } from "lucide-react";
 import {
   getCurrentProfile, requestPasswordReset, saveDataUpdateSubmission,
@@ -24,7 +24,7 @@ const STEPS = [
     ["jumlahMotor", "Jumlah Sepeda Motor", "number", true], ["jumlahMobil", "Jumlah Mobil", "number", true],
     ["ternak", "Memiliki Ternak", "select", true, ["Tidak", "Ya"]],
   ], file: { key: "stnkBpkbFile", label: "Foto STNK/BPKB kendaraan", required: false, accept: ".jpg,.jpeg,.png,.pdf", conditional: true } },
-  { title: "Kondisi Tempat Tinggal", short: "Rumah", icon: House, color: "green", fields: [
+  { title: "Kondisi Tempat Tinggal", short: "Rumah", icon: Home, color: "green", fields: [
     ["lantai", "Jenis Lantai", "text", true], ["dinding", "Jenis Dinding", "text", true], ["atap", "Jenis Atap", "text", true],
     ["airMinum", "Sumber Air Minum", "text", true], ["sanitasi", "Kondisi Sanitasi/Jamban", "text", true], ["bahanBakar", "Bahan Bakar Memasak", "text", true],
   ], files: [
