@@ -71,3 +71,26 @@ export async function getMySubmissions() {
     return { ...row, nomorPengajuan: `DSK-${created.getFullYear()}${String(created.getMonth()+1).padStart(2,"0")}${String(created.getDate()).padStart(2,"0")}-${String(row.id).slice(0,4).toUpperCase()}` };
   });
 }
+
+
+export async function getAdminSubmissions() {
+  const { data, error } = await supabase.rpc("get_admin_submissions");
+  if (error) throw error;
+  return data || [];
+}
+
+export async function updateSubmissionStatus(submissionId, status) {
+  const { data, error } = await supabase.rpc("admin_update_submission_status", {
+    p_submission_id: submissionId,
+    p_status: status,
+  });
+  if (error) throw error;
+  return data;
+}
+
+export async function getAdminSignedUrl(path) {
+  if (!path) return null;
+  const { data, error } = await supabase.storage.from("dokumen-warga").createSignedUrl(path, 300);
+  if (error) throw error;
+  return data?.signedUrl || null;
+}
