@@ -194,7 +194,12 @@ function AdminScreen({ onBack }) {
   async function openFile(path, name = "Dokumen") {
     setPreviewLoading(true); setError("");
     try {
-      const url = await getAdminSignedUrl(path);
+      let storagePath = String(path || "").trim();
+      // File lama yang hanya menyimpan nama file dinormalisasi ke folder user.
+      if (storagePath && !storagePath.includes("/") && selected?.user_id) {
+        storagePath = `${selected.user_id}/${storagePath}`;
+      }
+      const url = await getAdminSignedUrl(storagePath);
       if (!url) throw new Error("Dokumen tidak ditemukan atau belum dapat diakses admin.");
       const lower = String(name || path).toLowerCase();
       const type = /\.(jpg|jpeg|png|webp|gif)$/i.test(lower) ? "image" : "pdf";
